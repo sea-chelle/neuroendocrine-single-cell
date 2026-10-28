@@ -2,6 +2,7 @@
 library(here)
 library(Seurat)
 library(scDblFinder)
+library(BiocParallel)
 
 # set working directory
 setwd(here("data"))
@@ -78,8 +79,11 @@ seurat_herb # 44589 cells
 # create SingleCellExperiment from seurat object for doublet removal
 sce_herb <- as.SingleCellExperiment(seurat_herb)
 
+# set seed
+bp <- SerialParam(RNGseed = 1234)
+
 # doublet removal using scDblFinder
-sce_herb <- scDblFinder(sce_herb, samples = sce_herb$sample)
+sce_herb <- scDblFinder(sce_herb, samples = sce_herb$sample, BPPARAM = bp)
 
 # check how many singlets and doublets there are
 table(sce_herb$scDblFinder.class) # 162 doublets

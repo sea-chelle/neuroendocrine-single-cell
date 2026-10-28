@@ -98,7 +98,7 @@ seurat_zhou <- JoinLayers(seurat_zhou) # needed for merged seurat objects only
 sce_zhou <- as.SingleCellExperiment(seurat_zhou)
 
 # doublet removal using scDblFinder
-sce_zhou <- scDblFinder(sce_zhou, samples = sce_zhou$sample)
+sce_zhou <- scDblFinder(sce_zhou, samples = sce_zhou$sample,  BPPARAM = bp)
 
 # check how many singlets and doublets there are
 table(sce_zhou$scDblFinder.class) # 13,567 doublets
@@ -111,14 +111,3 @@ seurat_zhou <- subset(doublets_zhou, subset = scDblFinder.class  == "singlet")
 
 # check how many cells after doublet removal
 seurat_zhou # 213,851 cells
-
-# set workding directory to plots
-setwd("/Volumes/ritd-ag-project-rd01lx-nhhan20/Michelle/analysed_data/neuroendocrine/plots")
-
-# plot qc violin plots
-VlnPlot(seurat_zhou, features = c("nFeature_RNA", "nCount_RNA", "percent.mt", "percent.hb"), ncol = 2, pt.size = 0)
-# ggsave("zhou_qc.png", height = 10, width = 5)
-
-# save seurat object
-setwd("/Volumes/ritd-ag-project-rd01lx-nhhan20/Michelle/analysed_data/neuroendocrine/data/zhou_2022/")
-saveRDS(seurat_zhou, "seurat_zhou.rds")
