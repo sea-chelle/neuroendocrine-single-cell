@@ -116,5 +116,5 @@ setwd(here("r_obj"))
 saveRDS(seurat_zhou, "seurat_zhou.rds")
 
 # remove uneeded R objects
-rm(list = c("doublets_zhou", "doublets_herb", "HypoNormDat", "info", "obj", "zhou_objects", "bp", "dirs", "gw_mapping", "hb_genes", 
-            "i", "name", "x", "nm", "sample_names", ls(pattern = "^GW")))
+rm(list = c("doublets_zhou", "doublets_herb", "sce_herb", "sce_zhou", "metadata_herb", "HypoNormDat", "info", "obj", 
+            "zhou_objects", "bp", "dirs", "gw_mapping", "hb_genes", "i", "name", "x", "nm", "sample_names", ls(pattern = "^GW")))
