@@ -8,7 +8,7 @@ library(BiocParallel)
 setwd(here("data"))
 
 # import herb 2023 dataset
-load("HypoSamples_PostSCT.rda")
+load("herb_2022/HypoSamples_PostSCT.rda")
 
 # update seurat objects in HypoNormDat
 seurat_herb <- lapply(HypoNormDat, UpdateSeuratObject)
@@ -86,7 +86,7 @@ bp <- SerialParam(RNGseed = 1234)
 sce_herb <- scDblFinder(sce_herb, samples = sce_herb$sample, BPPARAM = bp)
 
 # check how many singlets and doublets there are
-table(sce_herb$scDblFinder.class) # 162 doublets
+table(sce_herb$scDblFinder.class) # 516 doublets
 
 # convert sce back into seurat object
 doublets_herb <- as.Seurat(sce_herb, counts = "counts", data = NULL)
@@ -95,4 +95,8 @@ doublets_herb <- as.Seurat(sce_herb, counts = "counts", data = NULL)
 seurat_herb <- subset(doublets_herb, subset = scDblFinder.class  == "singlet")
 
 # check how many cells after doublet removal
-seurat_herb # 44,427 cells
+seurat_herb # 44,073 cells
+
+# save clean seurat_herb obj
+setwd(here("r_obj"))
+saveRDS(seurat_herb, "seurat_herb.rds")

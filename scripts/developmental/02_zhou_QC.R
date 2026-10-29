@@ -3,6 +3,7 @@ library(here)
 library(tidyverse)
 library(Seurat)
 library(scDblFinder)
+library(BiocParallel)
 
 # set working directory
 setwd(here("data"))
@@ -25,8 +26,6 @@ for(x in dirs) {
 # merge seurat objects from the same biological replicate together
 GW7_sample1_whole_male <- merge(GW7_sample1_lane1_whole_male, GW7_sample1_lane2_whole_male)
 GW8_sample1_whole_female <- merge(GW8_sample1_lane1_whole_female, GW8_sample1_lane2_whole_female)
-rm(list = c("GW7_sample1_lane1_whole_male", "GW7_sample1_lane2_whole_male", 
-            "GW8_sample1_lane1_whole_female", "GW8_sample1_lane2_whole_female"))
 
 # get names of all zhou samples
 sample_names <- c("GW10_sample1_whole_male", "GW12_sample1_whole_male", "GW12_sample2_whole_male", 
@@ -61,10 +60,10 @@ seurat_zhou <- merge(x = zhou_objects[[1]], y = zhou_objects[-1],
 head(seurat_zhou@meta.data)
 
 # check if all sample info are in the metadata columns
-unique(seurat_zhou@meta.data$gestational.week) # checking gestational.week column
-unique(seurat_zhou@meta.data$sample) #checking sample column
-unique(seurat_zhou@meta.data$hypothalamus.location) #checking hypothalamus.location column
-unique(seurat_zhou@meta.data$sex) # checking sex column
+unique(seurat_zhou@meta.data$gestational.week) 
+unique(seurat_zhou@meta.data$sample) 
+unique(seurat_zhou@meta.data$hypothalamus.location)
+unique(seurat_zhou@meta.data$sex)
 
 # check how many cells before QC
 seurat_zhou # 295,985 cells
@@ -94,14 +93,14 @@ seurat_zhou <- subset(seurat_zhou,
 seurat_zhou # 230,382 cells
 
 # create SingleCellExperiment from seurat object for doublet removal
-seurat_zhou <- JoinLayers(seurat_zhou) # needed for merged seurat objects only
+seurat_zhou <- JoinLayers(seurat_zhou)
 sce_zhou <- as.SingleCellExperiment(seurat_zhou)
 
 # doublet removal using scDblFinder
-sce_zhou <- scDblFinder(sce_zhou, samples = sce_zhou$sample,  BPPARAM = bp)
+sce_zhou <- scDblFinder(sce_zhou, samples = sce_zhou$sample, BPPARAM = bp)
 
 # check how many singlets and doublets there are
-table(sce_zhou$scDblFinder.class) # 13,567 doublets
+table(sce_zhou$scDblFinder.class) # 33,933 doublets
 
 # convert sce back into seurat object
 doublets_zhou <- as.Seurat(sce_zhou, counts = "counts", data = NULL)
@@ -110,4 +109,12 @@ doublets_zhou <- as.Seurat(sce_zhou, counts = "counts", data = NULL)
 seurat_zhou <- subset(doublets_zhou, subset = scDblFinder.class  == "singlet")
 
 # check how many cells after doublet removal
-seurat_zhou # 213,851 cells
+seurat_zhou # 196,449 cells
+
+# save clean seurat_herb obj
+setwd(here("r_obj"))
+saveRDS(seurat_zhou, "seurat_zhou.rds")
+
+# remove uneeded R objects
+rm(list = c("doublets_zhou", "doublets_herb", "HypoNormDat", "info", "obj", "zhou_objects", "bp", "dirs", "gw_mapping", "hb_genes", 
+            "i", "name", "x", "nm", "sample_names", ls(pattern = "^GW")))
