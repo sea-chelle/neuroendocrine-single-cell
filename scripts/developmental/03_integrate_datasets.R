@@ -1,16 +1,15 @@
 # load required packages
+library(here)
 library(Seurat)
-library(tidyverse)
-library(SingleCellExperiment)
-library(scDblFinder)
-library(BiocParallel)
 library(harmony)
 
 # set working directory
 setwd(here("r_obj"))
 
 # merge herb and zhou datasets
-seurat_dev <- merge(seurat_herb, seurat_zhou, add.cell.ids = c("herb", "zhou"), merge.data = FALSE)
+seurat_dev <- merge(seurat_herb, seurat_zhou, 
+                    add.cell.ids = c("herb", "zhou"), 
+                    merge.data = FALSE)
 
 # perform standard seurat workflow
 seurat_dev <- NormalizeData(seurat_dev)

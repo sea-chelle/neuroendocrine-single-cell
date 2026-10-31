@@ -10,7 +10,7 @@ setwd(here("data"))
 # import herb 2023 dataset
 load("herb_2022/HypoSamples_PostSCT.rda")
 
-# update seurat objects in HypoNormDat
+s# update seurat objects in HypoNormDat
 seurat_herb <- lapply(HypoNormDat, UpdateSeuratObject)
 
 # add sample name as metadata
