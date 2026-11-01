@@ -156,7 +156,7 @@ ARC_dev <- NormalizeData(ARC_dev)
 ARC_dev <- FindVariableFeatures(ARC_dev,  selection.method = "vst",  nfeatures = 2000)
 
 # remove neuropeptides from highly variable genes
-hvgs_AH <- setdiff(VariableFeatures(anterior_dev), peptides)
+hvgs_ARC <- setdiff(VariableFeatures(ARC_dev), peptides)
 
 # continue with standard seurat workflow
 ARC_dev <- ScaleData(ARC_dev, features = hvgs_ARC, vars.to.regress = c("S.Score", "G2M.Score", "percent.mt"))
@@ -286,6 +286,26 @@ nuclei_dev$NEN_subtype[colnames(nuclei_dev) %in%
 # number of each NEN subtype
 table(nuclei_dev$NEN_subtype)
 
+# pie chart for global proportion of NENs and non-NENs within hypothalamic nuclei
+NEN_summary <- nuclei_dev@meta.data %>%
+  count(NEN_type, name = "cell_count")
+
+NEN_summary_pie <- NEN_summary %>%
+  mutate(percentage = cell_count / sum(cell_count) * 100)
+
+ggplot(NEN_summary_pie, aes(x = "", y = percentage, fill = NEN_type)) +
+  geom_col(width = 1) +
+  geom_text(aes(x = 1.6, label = paste0(round(percentage, 1), "%")),
+            position = position_stack(vjust = 0.5),
+            size = 2.5
+  ) +
+  coord_polar(theta = "y", clip = "off") +
+  scale_fill_manual(values = c("NEN" = "#A995C9", "non_NEN" = "grey85")) +
+  theme_void() +
+  theme(legend.position = "none")
+
+ggsave("NEN_pie_proportions.tiff", height = 1.5, width = 1.5, dpi = 600, compression = "lzw")
+
 # stacked bar plot per region of NENs vs non-NENs
 NEN_region_summary <- nuclei_dev@meta.data %>%
   filter(cell_type %in% c("AH", "PVN", "ARC")) %>%
@@ -312,23 +332,6 @@ ggplot(NEN_region_summary, aes(x = cell_type, y = percentage, fill = NEN_type)) 
         legend.key.size = unit(0.3, "cm"))
 
 ggsave("NEN_per_region.tiff", height = 1.5, width = 2.6, dpi = 600, compression = "lzw")
-
-# pie chart for global proportion of NENs and non-NENs within hypothalamic nuclei
-NEN_summary_pie <- NEN_summary %>%
-  mutate(percentage = cell_count / sum(cell_count) * 100)
-
-ggplot(NEN_summary_pie, aes(x = "", y = percentage, fill = NEN_type)) +
-  geom_col(width = 1) +
-  geom_text(aes(x = 1.6, label = paste0(round(percentage, 1), "%")),
-    position = position_stack(vjust = 0.5),
-    size = 2.5
-  ) +
-  coord_polar(theta = "y", clip = "off") +
-  scale_fill_manual(values = c("NEN" = "#A995C9", "non_NEN" = "grey85")) +
-  theme_void() +
-  theme(legend.position = "none")
-
-ggsave("NEN_pie_proportions.tiff", height = 1.5, width = 1.5, dpi = 600, compression = "lzw")
 
 # violin plot of neuropeptides and markers
 NEN_violin <- VlnPlot(subset(nuclei_dev, subset = NEN_type == "NEN"),
