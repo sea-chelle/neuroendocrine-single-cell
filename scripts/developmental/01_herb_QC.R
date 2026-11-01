@@ -128,21 +128,21 @@ seurat_herb$gestational.week <- unname(gw_mapping[as.character(seurat_herb$sampl
 # check cell number before QC
 seurat_herb # 51,554 cells
 
-# calculate mitochondrial DNA percentage
+# calculate mitochondrial RNA percentage
 seurat_herb$percent.mt <- PercentageFeatureSet(seurat_herb, pattern = "^MT-")
 
-# calculate ribosomal DNA percentage
+# calculate ribosomal RNA percentage
 seurat_herb$percent.rb <- PercentageFeatureSet(seurat_herb, pattern = "^RP[SL]")
 
-# calculate haemoglobin DNA percentage
+# calculate haemoglobin RNA percentage
 hb_genes <- c("HBA1", "HBA2", "HBB", "HBD", "HBG1", "HBG2", "HBE1", "HBM", "HBQ1", "HBZ")
 seurat_herb$percent.hb <- PercentageFeatureSet(seurat_herb, features = hb_genes)
 
-# filter out cells expressing more than 10% mtDNA and 5% hbDNA and keep cells between 200-4000 total reads
-seurat_herb <- subset(seurat_herb, 
-                      subset = nFeature_RNA >= 200 & nFeature_RNA <= 4000 &
-                        percent.mt < 10 &
-                        percent.hb < 5)
+# filter out cells expressing more than 200 and less than 4000 genes, 10% mtDNA and 5% hbDNA
+seurat_herb <- subset(seurat_herb,
+                      subset = nFeature_RNA > 200 & nFeature_RNA < 4000 & 
+                        nCount_RNA > 1000 & nCount_RNA < 15000 &
+                        percent.mt < 10 & percent.hb < 5)
 
 # check how many cells after initial QC
 seurat_herb # 44912 cells
@@ -157,7 +157,7 @@ bp <- SerialParam(RNGseed = 1234)
 sce_herb <- scDblFinder(sce_herb, samples = sce_herb$sample, BPPARAM = bp)
 
 # check how many singlets and doublets there are
-table(sce_herb$scDblFinder.class) # 516 doublets
+table(sce_herb$scDblFinder.class) # 2526 doublets
 
 # convert sce back into seurat object
 doublets_herb <- as.Seurat(sce_herb, counts = "counts", data = NULL)
@@ -166,7 +166,7 @@ doublets_herb <- as.Seurat(sce_herb, counts = "counts", data = NULL)
 seurat_herb <- subset(doublets_herb, subset = scDblFinder.class  == "singlet")
 
 # check how many cells after doublet removal
-seurat_herb # 44,073 cells
+seurat_herb # 42,386 cells
 
 # save clean seurat_herb obj
 saveRDS(seurat_herb, here("r_obj", "seurat_herb.rds"))
