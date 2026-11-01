@@ -124,6 +124,9 @@ gw_mapping <- c("CS13" = "GW6",
 # add gestational week
 seurat_herb$gestational.week <- unname(gw_mapping[as.character(seurat_herb$sample)])
 
+# add donor metadata
+seurat_herb$donor <- as.character(seurat_herb$sample)
+
 # check cell number before QC
 seurat_herb # 51,554 cells
 
