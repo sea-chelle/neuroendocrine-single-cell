@@ -43,8 +43,7 @@ harmonise_gene_symbols <- function(object, dataset_name, assay = "RNA") {
     stop("No raw counts layer found in the RNA assay.")
   }
   
-  if (length(count_layers) > 1) {
-    object <- JoinLayers(object, assay = assay, layers = count_layers, new = "counts")
+  if (length(count_layers) > 1) {object <- JoinLayers(object, assay = assay)
   }
   
   # extract the raw counts
