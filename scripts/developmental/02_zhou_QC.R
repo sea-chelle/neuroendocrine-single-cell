@@ -4,6 +4,8 @@ library(tidyverse)
 library(Seurat)
 library(scDblFinder)
 library(BiocParallel)
+library(HGNChelper)
+library(Matrix)
 
 # set working directory
 setwd(here("data"))
@@ -12,7 +14,7 @@ setwd(here("data"))
 dirs <- list.dirs(path = "zhou_2022/",
                   recursive = FALSE, full.names = FALSE)
 
-# importing matrix files and creating seurat object for each folder in dirs
+# import matrix files and create seurat object for each folder in dirs
 for(x in dirs) {
   name <- gsub("_matrix", "", x)
   
@@ -24,8 +26,11 @@ for(x in dirs) {
 }
 
 # merge seurat objects from the same biological replicate together
-GW7_sample1_whole_male <- merge(GW7_sample1_lane1_whole_male, GW7_sample1_lane2_whole_male)
-GW8_sample1_whole_female <- merge(GW8_sample1_lane1_whole_female, GW8_sample1_lane2_whole_female)
+GW7_sample1_whole_male <- merge(GW7_sample1_lane1_whole_male, GW7_sample1_lane2_whole_male,
+                                add.cell.ids = c("lane1", "lane2"), merge.data = FALSE)
+
+GW8_sample1_whole_female <- merge(GW8_sample1_lane1_whole_female, GW8_sample1_lane2_whole_female,
+                                  add.cell.ids = c("lane1", "lane2"), merge.data = FALSE)
 
 # get names of all zhou samples
 sample_names <- c("GW10_sample1_whole_male", "GW12_sample1_whole_male", "GW12_sample2_whole_male", 
@@ -39,22 +44,61 @@ sample_names <- c("GW10_sample1_whole_male", "GW12_sample1_whole_male", "GW12_sa
 zhou_objects <- mget(sample_names)
 
 # add metadata from each object's known name
-for (nm in names(zhou_objects)) {
-  info <- str_match(nm, "^(GW\\d+)_(sample\\d+)_(whole|anterior|medial|posterior)_(male|female)$")
+for (name in names(zhou_objects)) {
+  info <- str_match(name, "^(GW\\d+)_(sample\\d+)_(whole|anterior|medial|posterior)_(male|female)$")
   
-  obj <- zhou_objects[[nm]]
-  obj$gestational.week <- rep(info[2], ncol(obj))
-  obj$sample.id <- rep(info[3], ncol(obj))
-  obj$hypothalamus.location <- rep(info[4], ncol(obj))
+  obj <- zhou_objects[[name]]
+  
+  obj$gestational.week <- rep(info[2], ncol(obj)) 
+  obj$sample.id <- rep(info[3], ncol(obj)) 
+  obj$hypothalamus.location <- rep(info[4], ncol(obj)) 
   obj$sex <- rep(info[5], ncol(obj))
-  obj$sample <- rep(nm, ncol(obj))
+  obj$sample <- rep(name, ncol(obj))
+  obj$donor <- rep(paste(info[2], info[3], sep = "_"), ncol(obj)) # biological donor, irrespective of anatomical dissection
   obj$barcode <- colnames(obj)
-  zhou_objects[[nm]] <- obj
+  
+  zhou_objects[[name]] <- obj
 }
+
+# harmonise gene symbols of each sample objects individually
+zhou_symbol_map <- NULL
+
+for (name in names(zhou_objects)) {
+  
+  message("Harmonising gene symbols for: ", name)
+  
+  harmonised_result <- harmonise_gene_symbols(zhou_objects[[name]], dataset_name = "zhou")
+  
+  # replace the original sample object with its corrected version
+  zhou_objects[[name]] <- harmonised_result$object
+  
+  # retain the mapping table
+  if (is.null(zhou_symbol_map)) { 
+    zhou_symbol_map <- harmonised_result$symbol_map
+    } else {
+    new_symbols <- !harmonised_result$symbol_map$original_symbol %in%
+      zhou_symbol_map$original_symbol
+    zhou_symbol_map <- rbind(zhou_symbol_map, harmonised_result$symbol_map[new_symbols, ])
+  }
+  
+  # remove temporary result before processing the next sample
+  rm(harmonised_result)
+  gc()
+}
+
+# save the mapping table for reproducibility
+write.csv(zhou_symbol_map, here("csv", "zhou_gene_symbol_mapping.csv"), row.names = FALSE)
+table(zhou_symbol_map$changed)
+
+# validate every corrected sample
+vapply(zhou_objects,
+  function(object) {
+    anyDuplicated(rownames(object))
+  }, integer(1))
 
 # merged object 
 seurat_zhou <- merge(x = zhou_objects[[1]], y = zhou_objects[-1],
-                     add.cell.ids = names(zhou_objects), project = "zhou_2022")
+                     add.cell.ids = names(zhou_objects), project = "zhou_2022", merge.data = FALSE)
 
 # check metadata
 head(seurat_zhou@meta.data)
@@ -65,16 +109,16 @@ unique(seurat_zhou@meta.data$sample)
 unique(seurat_zhou@meta.data$hypothalamus.location)
 unique(seurat_zhou@meta.data$sex)
 
-# check how many cells before QC
+# check cell number before QC
 seurat_zhou # 295,985 cells
 
-# calculate mitochondiral DNA percentage
+# calculate mitochondiral RNA percentage
 seurat_zhou$percent.mt <- PercentageFeatureSet(seurat_zhou, pattern = "^MT-")
 
-# calculate ribosomal DNA percentage
+# calculate ribosomal RNA percentage
 seurat_zhou$percent.rb <- PercentageFeatureSet(seurat_zhou, pattern = "^RP[SL]")
 
-# calculate haemoglobin DNA percentage
+# calculate haemoglobin RNA percentage
 seurat_zhou$percent.hb <- PercentageFeatureSet(seurat_zhou, features = hb_genes)
 
 # check QC columns have been added to metadata
@@ -82,15 +126,12 @@ head(seurat_zhou@meta.data)
 
 # filter out cells expressing more than 200 and less than 4000 genes, 10% mtDNA and 5% hbDNA
 seurat_zhou <- subset(seurat_zhou,
-                      subset = nFeature_RNA > 200 &
-                        nFeature_RNA < 4000 &
-                        nCount_RNA > 1000 &
-                        nCount_RNA < 15000 &
-                        percent.mt < 10 &
-                        percent.hb < 5)
+                      subset = nFeature_RNA > 200 & nFeature_RNA < 4000 & 
+                        nCount_RNA > 1000 & nCount_RNA < 15000 &
+                        percent.mt < 10 & percent.hb < 5)
 
-# check how many cells after initial QC
-seurat_zhou # 230,382 cells
+# check cell number after initial QC
+seurat_zhou # 230,407 cells
 
 # create SingleCellExperiment from seurat object for doublet removal
 seurat_zhou <- JoinLayers(seurat_zhou)
@@ -100,7 +141,7 @@ sce_zhou <- as.SingleCellExperiment(seurat_zhou)
 sce_zhou <- scDblFinder(sce_zhou, samples = sce_zhou$sample, BPPARAM = bp)
 
 # check how many singlets and doublets there are
-table(sce_zhou$scDblFinder.class) # 33,933 doublets
+table(sce_zhou$scDblFinder.class) # 33,875 doublets
 
 # convert sce back into seurat object
 doublets_zhou <- as.Seurat(sce_zhou, counts = "counts", data = NULL)
@@ -109,12 +150,7 @@ doublets_zhou <- as.Seurat(sce_zhou, counts = "counts", data = NULL)
 seurat_zhou <- subset(doublets_zhou, subset = scDblFinder.class  == "singlet")
 
 # check how many cells after doublet removal
-seurat_zhou # 196,449 cells
+seurat_zhou # 196,532 cells
 
-# save clean seurat_herb obj
-setwd(here("r_obj"))
-saveRDS(seurat_zhou, "seurat_zhou.rds")
-
-# remove uneeded R objects
-rm(list = c("doublets_zhou", "doublets_herb", "sce_herb", "sce_zhou", "metadata_herb", "HypoNormDat", "info", "obj", 
-            "zhou_objects", "bp", "dirs", "gw_mapping", "hb_genes", "i", "name", "x", "nm", "sample_names", ls(pattern = "^GW")))
+# save clean zhou seurat obj
+saveRDS(seurat_zhou, here("r_obj", "seurat_zhou.rds"))
