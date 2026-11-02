@@ -8,15 +8,16 @@ library(harmony)
 setwd(here("plots"))
 
 # run UMAP
-seurat_dev <- FindNeighbors(seurat_dev, reduction = "harmony", dims = 1:50)
-seurat_dev <- FindClusters(seurat_dev, resolution = 0.5)
-seurat_dev <- RunUMAP(seurat_dev, reduction = "harmony", dims = 1:50)
+seurat_dev <- FindNeighbors(seurat_dev, reduction = "harmony", dims = 1:40)
+seurat_dev <- FindClusters(seurat_dev, resolution = 0.4)
+seurat_dev <- RunUMAP(seurat_dev, reduction = "harmony", dims = 1:40)
 
 # visualise UUMAP
 DimPlot(seurat_dev, group.by = "seurat_clusters", reduction = "umap", label = TRUE) 
-table(seurat_dev@meta.data$seurat_clusters) # look at cluster sizes
+ggsave("umap_major_unannotated.png", height = 7, width = 8)
 
-# ggsave("umap_major_unannotated.png", height = 7, width = 8)
+# cluster sizes
+table(seurat_dev@meta.data$seurat_clusters) 
 
 # neuroepithelial markers
 FeaturePlot(seurat_dev, features = c("SOX2", "SOX1", "SOX10", "PAX6", "VIM", "TJP1", "OCLN", "NES", "HES1", "NOTCH1", "CDH1",
@@ -41,11 +42,11 @@ VlnPlot(seurat_dev,
         pt.size = 0)
 ggsave("violin_radialglia_markers.png", height = 15, width = 35, dpi = 300)
 
-# neural progenitor cell (NPC) markers
+# neural progenitor cell (NPC) / intermediate progenitor markers
 FeaturePlot(seurat_dev, 
             features = c("ASCL1", "NEUROG2", "NEUROD1", "EOMES", "DCX", "FABP7", "NES", "NBPF10", "NBPF15", "STMN2", "PLAGL1", 
                          "SFTA3", "EGFR", "SYT1", "NHLH1", "NHLH2"))
-gsave("umap_npc_markers.png", height = 25, width = 25, dpi = 300)
+ggsave("umap_npc_markers.png", height = 25, width = 25, dpi = 300)
 
 VlnPlot(seurat_dev, 
         features = c("ASCL1", "NEUROG2", "NEUROD1", "EOMES", "DCX", "FABP7", "NES", "NBPF10", "NBPF15", "STMN2", "PLAGL1", 
@@ -167,18 +168,17 @@ top10_markers <- function(x){
   major_markers[major_markers$cluster == x, ] %>% head(n = 10)
   }
 
-top10_markers_df <- map_dfr(0:34, top10_markers)
+top10_markers_df <- map_dfr(0:41, top10_markers)
 
 # save as .csv file
-setwd(here("csv"))
-# write.csv(top10_markers_df, "major_top10_markers.csv")
+write.csv(top10_markers_df, here("csv", "major_top10_markers.csv"))
 
 # renaming cluster to cell types
-new_cluster_ids <- c("neuron", "astrocyte", "neuron", "OPC", "astrocyte", "neuron", "microglia", "ependymal", "tanycyte", 
-                     "intermediate progenitor", "VLMC", "cycling progenitor", "oligodendrocyte", "neuron", "neuron", "ependymal", 
-                     "neuron", "mural", "neuron", "radial glia", "endothelial", "VLMC", "radial glia", 
-                     "intermediate progenitor", "cycling progenitor", "microglia", "cycling progenitor", "neuron", "microglia", 
-                     "neuron", "neuron", "neuron", "neuron", "microglia", "OPC")
+new_cluster_ids <- c("Neuron", "Astrocyte", "OPC", "Neuron", "Neuron", "Astrocyte", "RG", "Microglia", "Neuron", "RG",
+                     "RG", "IPC", "Neuron", "Neuroepithelial", "Oligodendrocyte", "Pericyte", "Neuron", "Ependymal", "Endothelial", 
+                     "Cycling progenitor", "Ependymal", "Cycling progenitor", "Neuroepithelial", "Ependymal", "VLMC", "Cycling progenitor", 
+                     "OPC", "Microglia", "Neuron", "Astrocyte", "Astrocyte", "Neuron", "Cycling progenitor", "Neuron", "Macrophage", "Neuron", 
+                     "Neuron", "Neuron", "Neuron", "Cycling progenitor", "Cycling progenitor", "Tanycyte")
 
 names(new_cluster_ids) <- levels(seurat_dev)
 seurat_dev <- RenameIdents(seurat_dev, new_cluster_ids)
@@ -186,12 +186,17 @@ seurat_dev@meta.data$"cell_type" <- as.factor(seurat_dev@active.ident)
 seurat_dev$cell_type <- factor(seurat_dev$cell_type, levels = sort(unique(as.character(seurat_dev$cell_type))))
 
 # visualise annotated UMAP
+seurat_dev$cell_type <- factor(seurat_dev$cell_type,
+                               levels = c("Neuroepithelial", "RG", "IPC", "Cycling progenitor", "Neuron",
+                                          "Astrocyte", "OPC", "Oligodendrocyte", "Microglia", "Macrophage", "Ependymal", "Tanycyte",
+                                          "Endothelial", "Pericyte", "VLMC"))
+
 DimPlot(seurat_dev, reduction = "umap", group.by = "cell_type", label = FALSE, pt.size = 1.5) +
   scale_colour_manual(
-    values = c("astrocyte" = "#78A8D1", "cycling progenitor" = "#D5A928", "endothelial" = "#B85F78", "ependymal" = "#858B91",
-               "intermediate progenitor" = "#765996", "microglia" = "#A995C9", "mural" = "#B85F5A", "mural/VLMC" = "#DD805E",
-               "neuron" = "#D78FA9", "oligodendrocyte" = "#3F8C5A", "OPC" = "#5FA9A2", "radial glia" = "#8A6246",
-               "tanycyte" = "#829B73", "VLMC" = "#DD805E"),
+    values = c("Astrocyte" = "#D78FA9", "Cycling progenitor" = "#8E3F54", "Endothelial" = "#755333", "Ependymal" = "#829B73",
+               "IPC" = "#D5A928", "Macrophage" = "#B85F78", "Microglia" = "#765996", "Neuroepithelial" = "#DD805E", 
+               "Neuron" = "#A995C9", "Oligodendrocyte" = "#B2A52E", "OPC" = "#5FA9A2", "Pericyte" = "#3F8C5A", "RG" = "#78A8D1",
+               "Tanycyte" = "#587F9E", "VLMC" = "#B85F5A"),
     labels = function(x) sub(" progenitor$", "\nprogenitor", x)) +
   guides(colour = guide_legend(override.aes = list(size = 1.5))) +
   theme_void() +
@@ -200,23 +205,25 @@ DimPlot(seurat_dev, reduction = "umap", group.by = "cell_type", label = FALSE, p
         legend.key.height = unit(4, "mm"),
         legend.box.spacing = unit(0, "pt"))
 
-ggsave("umap_major_annotated.tiff", height = 2.5, width = 3.1, dpi = 600, compression = "lzw")
+ggsave("umap_major_annotated.tiff", height = 2.5, width = 3.2, dpi = 600, compression = "lzw")
 
 # plot dotplot of markers
 DotPlot(seurat_dev, assay = "RNA", group.by = "cell_type",
-        features = c("COL1A2", "COL3A1", "LUM",              # VLMC
-                     "CRYM", "SLC1A3",                       # tanycyte
-                     "SOX2", "VIM", "HES1",                  # radial glia
-                     "PDGFRA", "PCDH15", "OLIG1",            # OPC
-                     "MBP", "MOG", "BCAS1",                  # oligodendrocyte
-                     "STMN2", "TUBB3", "GAP43", "SYT1",      # neuron
-                     "PDGFRB", "RGS5", "COL4A1",             # mural
-                     "AIF1", "TYROBP", "C1QC",               # microglia
-                     "ASCL1", "EGFR",                        # intermediate progenitor
-                     "FOXJ1", "DNAI1", "DNAH9",              # ependymal
-                     "CLDN5", "FLT1", "PECAM1",              # endothelial
-                     "MKI67", "TOP2A",                       # cycling progenitor
-                     "AQP4", "GFAP", "GJA1"                  # astrocyte
+        features = c("LUM", "COL1A1", "PTGDS",             # VLMC
+                     "ABCC9", "KCNJ8", "PDGFRB",            # pericyte
+                     "PECAM1", "FLT1", "CLDN5",            # endothelial
+                     "CRYM",                               # tanycyte
+                     "FOXJ1", "DNAI1", "DNAH9",            # ependymal
+                     "CD163", "LYVE1", "MRC1",             # macrophage
+                     "TMEM119", "CX3CR1", "P2RY12",        # microglia
+                     "MOG", "MBP", "BCAS1",                # oligodendrocyte
+                     "PCDH15", "PDGFRA", "OLIG1",          # OPC
+                     "GFAP", "SLC1A2", "AQP4",             # astrocyte
+                     "GAP43", "TUBB3", "STMN2",            # neuron
+                     "PCNA", "TOP2A", "MKI67",             # cycling progenitor
+                     "HES6", "EGFR", "ASCL1",              # intermediate progenitor
+                     "COL2A1", "HES1", "VIM",              # radial glia
+                     "PAX6", "HMGA2", "CDH2"               # neuroepithelial
                      ),
         dot.scale = 3, cols = c("grey100", "#7656A8")) +
   coord_flip() +
@@ -232,9 +239,11 @@ DotPlot(seurat_dev, assay = "RNA", group.by = "cell_type",
         legend.key.height = unit(5, "mm"),
         legend.spacing.y = unit(0, "mm"),
         legend.box.spacing = unit(0, "pt"),
-        panel.grid = element_blank())
+        panel.grid = element_blank(),
+        panel.heights = unit(43 * 0.3, "cm"),
+        panel.widths = unit(length(unique(seurat_dev$cell_type)) * 0.4, "cm"))
 
-ggsave("major_marker_dotplot.tiff", height = 5, width = 3.5, dpi = 600, compression = "lzw")
+ggsave("major_marker_dotplot.tiff", height = 6, width = 3.5, dpi = 600, compression = "lzw")
 
 # remove objects
 rm(new_cluster_id)
