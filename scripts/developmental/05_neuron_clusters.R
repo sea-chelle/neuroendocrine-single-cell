@@ -1,16 +1,16 @@
 # loading required packages
+library(here)
 library(Seurat)
 library(tidyverse)
-library(ggplot2)
 library(scales)
 
 # set working directory to figures
 setwd(here("plots"))
 
 # subsetting neuronal clusters for subclustering
-neuron_dev <- subset(seurat_dev, idents = "neuron")
+neuron_dev <- subset(seurat_dev, idents = "Neuron")
 
-# normalise and scale data as usual
+# normalise and final variable features
 neuron_dev <- NormalizeData(neuron_dev)
 neuron_dev <- FindVariableFeatures(neuron_dev,selection.method = "vst", nfeatures = 2000)
 
@@ -25,9 +25,9 @@ neuron_dev <- RunPCA(neuron_dev, features = VariableFeatures(object = neuron_dev
 ElbowPlot(neuron_dev)
 
 # UMAP dimensionality reduction clusters
-neuron_dev <- FindNeighbors(neuron_dev, dims = 1:40)
+neuron_dev <- FindNeighbors(neuron_dev, dims = 1:30)
 neuron_dev <- FindClusters(neuron_dev, resolution = 0.5)
-neuron_dev <- RunUMAP(neuron_dev, dims = 1:40)
+neuron_dev <- RunUMAP(neuron_dev, dims = 1:30)
 
 # visualising clusters
 DimPlot(neuron_dev, reduction = "umap", group.by = "seurat_clusters", label = TRUE)
@@ -66,6 +66,27 @@ VlnPlot(neuron_dev,
         pt.size = 0)
 ggsave("violin_histamatergic_marker.png", height = 5, width = 10, dpi = 300)
 
+# immature neurons
+FeaturePlot(neuron_dev, 
+            features = c("STMN2", "TUBB3", "DCX", "GAP43"))
+ggsave("umap_immatureneuron_marker.png", height = 10, width = 10)
+
+VlnPlot(neuron_dev, 
+        features = c("STMN2", "TUBB3", "DCX", "GAP43"),
+        pt.size = 0)
+ggsave("violin_immatureneuron_marker.png", height = 8, width = 25, dpi = 300)
+
+# mature neurons
+FeaturePlot(neuron_dev, 
+            features = c("MAP2", "SYT1", "SNAP25", "SYN1", "RBFOX3", "NEFL", "NEFM"))
+ggsave("umap_matureneuron_marker.png", height = 12, width = 15)
+
+VlnPlot(neuron_dev, 
+        features = c("MAP2", "SYT1", "SNAP25", "SYN1", "RBFOX3", "NEFL", "NEFM"),
+        pt.size = 0)
+ggsave("violin_matureneuron_marker.png", height = 10, width = 25, dpi = 300)
+
+
 # find differentially expressed genes from each cell type
 neuron_dev_markers <- FindAllMarkers(neuron_dev, 
                                      only.pos = TRUE, 
@@ -75,54 +96,52 @@ neuron_dev_markers <- FindAllMarkers(neuron_dev,
 
 # get top 10 markers for each cluster
 top10_markers <- function(x){
-  neuron_dev_markers[neuron_dev_markers$cluster == x, ] %>% head(n = 10)}
+  neuron_dev_markers[neuron_dev_markers$cluster == x, ] %>% head(n = 10)
+  }
 
 # create df of top 10 markers for each cluster
-top10_markers_neuron_df <- map_dfr(0:29, top10_markers)
+top10_markers_neuron_df <- map_dfr(0:33, top10_markers)
 
 # save as .csv file
-setwd(here("csv"))
-write.csv(top10_markers_neuron_df, "neuron_dev_top10_markers.csv")
+write.csv(top10_markers_neuron_df, here("csv", "neuron_dev_top10_markers.csv"))
 
 # renaming cluster numbers to cell types
-new_cluster_ids_neuron <- c("immature", "immature", "GABAergic", "glutamatergic", "other", "immature", "GABAergic", "GABAergic", 
-                            "GABAergic", "immature", "glutamatergic", "histaminergic", "glutamatergic", "other", "GABAergic", 
-                            "GABAergic", "GABAergic", "GABAergic", "glutamatergic", "glutamatergic", "GABAergic", "other", 
-                            "glutamatergic", "immature", "glutamatergic", "glutamatergic", "glutamatergic", "GABAergic", 
-                            "glutamatergic", "GABAergic")
+new_cluster_ids_neuron <- c("Immature", "Immature", "Immature", "Other", "GABAergic", "Glutamatergic", "GABAergic", "Histaminergic", "GABAergic", 
+                            "GABAergic", "GABAergic", "Glutamatergic", "Glutamatergic", "GABAergic", "GABAergic", "Glutamatergic", "Glutamatergic", 
+                            "Glutamatergic", "Other", "Glutamatergic", "GABAergic", "Histaminergic", "Glutamatergic", "GABAergic", "Glutamatergic", 
+                            "GABAergic", "Glutamatergic", "GABAergic", "Glutamatergic", "GABAergic", "GABAergic", "Immature", "Glutamatergic", 
+                            "GABAergic")
 
 names(new_cluster_ids_neuron) <- levels(neuron_dev)
 neuron_dev <- RenameIdents(neuron_dev, new_cluster_ids_neuron)
 
-table(neuron_dev@meta.data$cell_type) # looking at cluster sizes
 
 # visualising clusters after cell-type identification
 neuron_dev@meta.data$"cell_type" <- as.factor(neuron_dev@active.ident)
+table(neuron_dev@meta.data$cell_type) # looking at cluster sizes
 
 DimPlot(neuron_dev, reduction = "umap", group.by = "cell_type", label = FALSE, pt.size = 1.5) +
-  scale_colour_manual(values = c("glutamatergic" = "#78A8D1", "GABAergic" = "#A995C9", "other" = "#D78FA9", 
-                                 "histaminergic" = "#5FA9A2", "immature" = "grey80")) +
+  scale_colour_manual(values = c("Glutamatergic" = "#78A8D1", "GABAergic" = "#A995C9", "Other" = "#D78FA9", 
+                                 "Histaminergic" = "#5FA9A2", "Immature" = "grey80")) +
   guides(colour = guide_legend(override.aes = list(size = 1.5))) +
   theme_void() +
   theme(plot.title = element_blank(), 
         legend.text = element_text(size = 7),
         legend.key.height = unit(4, "mm"),
         legend.box.spacing = unit(0, "pt"))
-
-ggsave("umap_neuron_annotated.tiff", height = 2.5, width = 3.1, dpi = 600, compression = "lzw")
+ggsave("umap_neuron_annotated.tiff", height = 3, width = 3.5, dpi = 600, compression = "lzw")
 
 # set order
 neuron_dev$cell_type <- factor(neuron_dev$cell_type,
-                               levels = c("immature", "glutamatergic", "GABAergic", "histaminergic", "other"))
+                               levels = c("Immature", "Glutamatergic", "GABAergic", "Histaminergic", "Other"))
 
 # plot dotplot of markers
 DotPlot(neuron_dev, assay = "RNA", group.by = "cell_type",
-        features = c("TBX3",  "KCNIP4", "GRID2",  # other neuron
-          "HDC", # histaminergic
+        features = c("HDC", # histaminergic
           "ARX", "DLX2","GAD2", "SLC32A1", # GABAergic
           "SLC17A6", # glutamatergic
-          "VIM", "HES1", # immature neuronal
-          "MAP2", "SYP", "STMN2", "TUBB3" # neuronal
+          "MAP2", "SYP", "STMN2", "TUBB3", # neuronal
+          "VIM", "HES1" # immature neuronal
           ),
         dot.scale = 3, cols = c("grey100", "#7656A8")) +
   coord_flip() +
@@ -138,6 +157,8 @@ DotPlot(neuron_dev, assay = "RNA", group.by = "cell_type",
         legend.key.height = unit(4, "mm"),
         legend.spacing.y = unit(0, "mm"),
         legend.box.spacing = unit(0, "pt"),
-        panel.grid = element_blank())
+        panel.grid = element_blank(),
+        panel.heights = unit(12 * 0.5, "cm"),
+        panel.widths = unit(length(unique(neuron_dev$cell_type)) * 0.5, "cm"))
 
-ggsave("major_marker_dotplot.tiff", height = 3, width = 3.5, dpi = 600, compression = "lzw")
+ggsave("major_marker_dotplot.tiff", height = 3, width = 2.1, dpi = 600, compression = "lzw")
