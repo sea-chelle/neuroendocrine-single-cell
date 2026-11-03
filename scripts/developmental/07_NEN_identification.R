@@ -24,7 +24,7 @@ ElbowPlot(PVN_dev)
 
 # UMAP dimensionality reduction clusters
 PVN_dev <- FindNeighbors(PVN_dev, dims = 1:20)
-PVN_dev <- FindClusters(PVN_dev, resolution = 0.6)
+PVN_dev <- FindClusters(PVN_dev, resolution = 0.8)
 PVN_dev <- RunUMAP(PVN_dev, dims = 1:20)
 
 # visualising clusters
@@ -43,7 +43,7 @@ ggsave("vln_PVN_neuropeptides.png", height = 10, width = 30)
 
 # neuroendocrine co-markers in the PVN
 FeaturePlot(PVN_dev, features = c("NR3C1", "SCGN", "AGTR1", "TAC1", "TH", "ADARB2", "CALB1", "KCNMB4", "FOXP1",
-                                       "THRB", "NFIB", "CALB2", "SFRP2", "OMP", "UCN3", "GHRH"))
+                                  "THRB", "NFIB", "CALB2", "SFRP2", "OMP", "UCN3", "GHRH"))
 ggsave("UMAP_PVN_neuroendocrine.png", height = 20, width = 25, dpi = 300)
 
 VlnPlot(PVN_dev, features = c("NR3C1", "SCGN", "PCSK1", "PCSK2", "AGTR1", "TAC1", "TH", "ADARB2", "CALB1", "KCNMB4", "FOXP1",
@@ -67,7 +67,7 @@ ElbowPlot(POA_dev)
 
 # UMAP dimensionality reduction clusters
 POA_dev <- FindNeighbors(POA_dev, dims = 1:20)
-POA_dev <- FindClusters(POA_dev, resolution = 0.6)
+POA_dev <- FindClusters(POA_dev, resolution = 0.8)
 POA_dev <- RunUMAP(POA_dev, dims = 1:20)
 
 # visualise clusters
@@ -112,7 +112,7 @@ ElbowPlot(anterior_dev)
 
 # UMAP dimensionality reduction clusters
 anterior_dev <- FindNeighbors(anterior_dev, dims = 1:20)
-anterior_dev <- FindClusters(anterior_dev, resolution = 0.6)
+anterior_dev <- FindClusters(anterior_dev, resolution = 0.8)
 anterior_dev <- RunUMAP(anterior_dev, dims = 1:20)
 
 # visualise clusters
@@ -165,7 +165,7 @@ ElbowPlot(ARC_dev)
 
 # UMAP dimensionality reduction clusters
 ARC_dev <- FindNeighbors(ARC_dev, dims = 1:20)
-ARC_dev <- FindClusters(ARC_dev, resolution = 0.6)
+ARC_dev <- FindClusters(ARC_dev, resolution = 0.8)
 ARC_dev <- RunUMAP(ARC_dev, dims = 1:20)
 
 # visualise clusters
@@ -194,7 +194,7 @@ VlnPlot(ARC_dev, features = c("TRH", "GAL",
 ggsave("vln_ARC_neuroendocrine.png", height = 15, width = 35)
 
 # subsetting tuberal hypothalamus clusters for subclustering
-tuberal_dev <- subset(nuclei_dev, idents = c("TH"))
+tuberal_dev <- subset(nuclei_dev, idents = c("Tuberal"))
 
 # normalise and scale data as usual
 tuberal_dev <- NormalizeData(tuberal_dev)
@@ -208,7 +208,7 @@ ElbowPlot(tuberal_dev)
 
 # UMAP dimensionality reduction clusters
 tuberal_dev <- FindNeighbors(tuberal_dev, dims = 1:20)
-tuberal_dev <- FindClusters(tuberal_dev, resolution = 0.6)
+tuberal_dev <- FindClusters(tuberal_dev, resolution = 0.8)
 tuberal_dev <- RunUMAP(tuberal_dev, dims = 1:20)
 
 # visualise clusters
@@ -226,14 +226,10 @@ VlnPlot(tuberal_dev, features = c("GHRH", "TH"))
 ggsave("Vln_tuberal_neuropeptides.png", height = 5, width = 15)
 
 # neuroendocrine co-markers in the tuberal hypothalamus
-FeaturePlot(tuberal_dev, features = c("TRH", "GAL",
-                                  "SLC6A3", "DDC", "SLC18A2", "GSX1", "FOXP2", "DLX1", "DLX2",
-                                  "PRLR", "ARX", "LHX1", "SST"))
+FeaturePlot(tuberal_dev, features = c("TRH", "GAL", "SLC6A3", "DDC", "SLC18A2", "GSX1", "FOXP2", "DLX1", "DLX2", "PRLR", "ARX", "LHX1", "SST"))
 ggsave("UMAP_tuberal_neuroendocrine.png", height = 25, width = 30, dpi = 300)
 
-VlnPlot(tuberal_dev, features = c("TRH", "GAL",
-                              "SLC6A3", "DDC", "SLC18A2", "GSX1", "FOXP2", "DLX1", "DLX2",
-                              "PRLR", "ARX", "LHX1", "SST"))
+VlnPlot(tuberal_dev, features = c("TRH", "GAL", "SLC6A3", "DDC", "SLC18A2", "GSX1", "FOXP2", "DLX1", "DLX2", "PRLR", "ARX", "LHX1", "SST"))
 ggsave("vln_tuberal_neuroendocrine.png", height = 15, width = 35)
 
 # check number and proportion of rare populations in each cluster
@@ -245,8 +241,8 @@ table(POA_dev$seurat_clusters[WhichCells(POA_dev, expression = GNRH1 > 0, slot =
 100 * table(POA_dev$seurat_clusters[WhichCells(POA_dev, expression = GNRH1 > 0, slot = "counts")]) /
   table(POA_dev$seurat_clusters) # GNRH1 in the POA
 
-table(ARC_dev$seurat_clusters[WhichCells(ARC_dev, expression = TH > 0, slot = "counts")])
-100 * table(ARC_dev$seurat_clusters[WhichCells(ARC_dev, expression = TH > 0, slot = "counts")]) /
+table(ARC_dev$seurat_clusters[WhichCells(ARC_dev, expression = DDC > 0, slot = "counts")])
+100 * table(ARC_dev$seurat_clusters[WhichCells(ARC_dev, expression = DDC > 0, slot = "counts")]) /
   table(ARC_dev$seurat_clusters) # TIDA neurons in the ARC
 
 # create NEN vs non_NEN column in metadata
@@ -254,13 +250,14 @@ nuclei_dev$NEN_type <- "non_NEN" # label every cell as non_NEN before rewriting 
 
 # add labels for NENs
 nuclei_dev$NEN_type[colnames(nuclei_dev) %in% 
-                      colnames(PVN_dev)[PVN_dev$seurat_clusters %in% c(3, 8, 9, 11)]] <- "NEN"
+                      colnames(PVN_dev)[PVN_dev$seurat_clusters %in% c(5, 8, 10, 13)]] <- "NEN"
 
 nuclei_dev$NEN_type[colnames(nuclei_dev) %in% 
-                      colnames(anterior_dev)[anterior_dev$seurat_clusters %in% c(3, 15, 16)]] <- "NEN"
+                      colnames(ARC_dev)[ARC_dev$seurat_clusters %in% c(6, 12)]] <- "NEN"
 
 nuclei_dev$NEN_type[colnames(nuclei_dev) %in% 
-                      colnames(ARC_dev)[ARC_dev$seurat_clusters %in% c(3, 5, 9)]] <- "NEN"
+                      colnames(tuberal_dev)[tuberal_dev$seurat_clusters %in% c(8)]] <- "NEN"
+
 
 # number of NENs there are
 table(nuclei_dev$NEN_type)
@@ -269,19 +266,19 @@ table(nuclei_dev$NEN_type)
 nuclei_dev$NEN_subtype <- "non_NEN" 
 
 nuclei_dev$NEN_subtype[colnames(nuclei_dev) %in% 
-                         colnames(PVN_dev)[PVN_dev$seurat_clusters %in% 3]] <- "CRH-AVP"
+                         colnames(PVN_dev)[PVN_dev$seurat_clusters %in% 5]] <- "AVP-CRH"
 
 nuclei_dev$NEN_subtype[colnames(nuclei_dev) %in% 
-                         colnames(PVN_dev)[PVN_dev$seurat_clusters %in% 11]] <- "AVP-OXT"
+                         colnames(PVN_dev)[PVN_dev$seurat_clusters %in% 13]] <- "AVP-OXT"
 
 nuclei_dev$NEN_subtype[colnames(nuclei_dev) %in% 
-                         colnames(PVN_dev)[PVN_dev$seurat_clusters %in% c(8, 9)]] <- "TRH"
+                         colnames(PVN_dev)[PVN_dev$seurat_clusters %in% c(8, 10)]] <- "TRH"
 
 nuclei_dev$NEN_subtype[colnames(nuclei_dev) %in% 
-                         colnames(anterior_dev)[anterior_dev$seurat_clusters %in% c(3, 15, 16)]] <- "AVP"
+                         colnames(ARC_dev)[ARC_dev$seurat_clusters %in% c(6, 12)]] <- "GHRH"
 
 nuclei_dev$NEN_subtype[colnames(nuclei_dev) %in% 
-                         colnames(ARC_dev)[ARC_dev$seurat_clusters %in% c(3, 5, 9)]] <- "GHRH"
+                         colnames(tuberal_dev)[tuberal_dev$seurat_clusters %in% 8]] <- "GHRH"
 
 # number of each NEN subtype
 table(nuclei_dev$NEN_subtype)
@@ -308,13 +305,13 @@ ggsave("NEN_pie_proportions.tiff", height = 1.5, width = 1.5, dpi = 600, compres
 
 # stacked bar plot per region of NENs vs non-NENs
 NEN_region_summary <- nuclei_dev@meta.data %>%
-  filter(cell_type %in% c("AH", "PVN", "ARC")) %>%
+  filter(cell_type %in% c("PVN", "ARC", "Tuberal")) %>%
   count(cell_type, NEN_type, name = "cell_count") %>%
   group_by(cell_type) %>%
   mutate(percentage = 100 * cell_count / sum(cell_count)) %>%
   ungroup()
 
-NEN_region_summary$cell_type <- factor(NEN_region_summary$cell_type, levels = c("ARC", "PVN", "AH"))
+NEN_region_summary$cell_type <- factor(NEN_region_summary$cell_type, levels = c("PVN", "ARC", "Tuberal"))
 
 ggplot(NEN_region_summary, aes(x = cell_type, y = percentage, fill = NEN_type)) +
   geom_col(width = 0.7) +
@@ -333,11 +330,15 @@ ggplot(NEN_region_summary, aes(x = cell_type, y = percentage, fill = NEN_type)) 
 
 ggsave("NEN_per_region.tiff", height = 1.5, width = 2.6, dpi = 600, compression = "lzw")
 
+# set order
+nuclei_dev$NEN_subtype <- factor(nuclei_dev$NEN_subtype,
+                               levels = c("AVP-CRH", "AVP-OXT", "TRH", "GHRH", "non_NEN"))
+
 # violin plot of neuropeptides and markers
 NEN_violin <- VlnPlot(subset(nuclei_dev, subset = NEN_type == "NEN"),
   features = c("AVP", "CRH", "OXT", "TRH", "GHRH",
-               "TAC1", "NR3C1", "FOXP1", "ADARB2", "KCNMB4", "NFIB", "GSX1", "FOXP2"),
-  group.by = "NEN_subtype",
+               "FOXP1", "NR3C1", "ADARB2", "KCNMB4", "NFIB", "GAL", "FOXP2", "GSX1"),
+  group.by = "NEN_subtype"
   cols = c(rep("#A995C9", 5), rep("#5FA9A2", 8)),
   pt.size = 0, stack = TRUE, flip = TRUE) +
   NoLegend() +
