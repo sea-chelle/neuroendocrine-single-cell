@@ -2,6 +2,8 @@
 library(here)
 library(tidyverse)
 library(Seurat)
+library(patchwork)
+library(ggrepel)
 
 # set working directory
 setwd(here("plots"))
@@ -49,6 +51,10 @@ ggsave("UMAP_PVN_neuroendocrine.png", height = 20, width = 25, dpi = 300)
 VlnPlot(PVN_dev, features = c("NR3C1", "SCGN", "PCSK1", "PCSK2", "AGTR1", "TAC1", "TH", "ADARB2", "CALB1", "KCNMB4", "FOXP1",
                                    "THRB", "NFIB", "CALB2", "SFRP2","OMP", "UCN3", "GHRH"))
 ggsave("vln_PVN_neuroendocrine.png", height = 20, width = 25)
+
+# exlcuding preautonomic ADARB2+ neuropeptidergic clusters
+VlnPlot(PVN_dev, features = c("ADARB2", "RELN", "SNCA", "NTNG1", "CACNA1G"),
+  group.by = "seurat_clusters", pt.size = 0, stack = TRUE, flip = TRUE)
 
 # subset POA clusters for subclustering
 POA_dev <- subset(nuclei_dev, idents = c("POA"))
@@ -232,6 +238,115 @@ ggsave("UMAP_tuberal_neuroendocrine.png", height = 25, width = 30, dpi = 300)
 VlnPlot(tuberal_dev, features = c("TRH", "GAL", "SLC6A3", "DDC", "SLC18A2", "GSX1", "FOXP2", "DLX1", "DLX2", "PRLR", "ARX", "LHX1", "SST"))
 ggsave("vln_tuberal_neuroendocrine.png", height = 15, width = 35)
 
+# subsetting unresolved hypothalamus clusters for subclustering
+unresolved_dev <- subset(nuclei_dev, idents = c("Unresolved"))
+
+# normalise and scale data as usual
+unresolved_dev <- NormalizeData(unresolved_dev)
+unresolved_dev <- FindVariableFeatures(unresolved_dev, selection.method = "vst",  nfeatures = 2000)
+hvgs_unknown <- setdiff(VariableFeatures(unresolved_dev), peptides)
+
+# continue with standard seurat workflow
+unresolved_dev <- ScaleData(unresolved_dev, features = hvgs_unknown, vars.to.regress = c("S.Score", "G2M.Score", "percent.mt"))
+unresolved_dev <- RunPCA(unresolved_dev, features = hvgs_unknown)
+ElbowPlot(unresolved_dev)
+
+# UMAP dimensionality reduction clusters
+unresolved_dev <- FindNeighbors(unresolved_dev, dims = 1:20)
+unresolved_dev <- FindClusters(unresolved_dev, resolution = 0.8)
+unresolved_dev <- RunUMAP(unresolved_dev, dims = 1:20)
+
+# visualise clusters
+DimPlot(unresolved_dev, reduction = "umap", group.by = "seurat_clusters", label = TRUE)
+ggsave("UMAP_unresolved_unannotated.png", height = 5, width = 6)
+
+# neuropeptidergic populations in the tuberal hypothalamus
+FeaturePlot(unresolved_dev, features = c("AVP", "CRH", "OXT", "TRH", "GNRH1", "GHRH"))
+ggsave("UMAP_unresolved_neuropeptides.png", height = 15, width = 15, dpi = 300)
+
+VlnPlot(unresolved_dev, features = c("AVP", "CRH", "OXT", "TRH", "GNRH1", "GHRH"))
+ggsave("Vln_unresolved_neuropeptides.png", height = 8, width = 15) # enrichment for PVN NENs - check lineage and co-markers
+
+# check expression of PVN lineage markers
+FeaturePlot(unresolved_dev, features = c("SIM1", "OTP", "POU3F2", "ARNT2"))
+ggsave("UMAP_unresolved_neuropeptides.png", height = 15, width = 15, dpi = 300)
+
+VlnPlot(unresolved_dev, features = c("SIM1", "OTP", "POU3F2", "ARNT2"))
+ggsave("Vln_unresolved_neuropeptides.png", height = 8, width = 15) # enrichment in Clusters 2, 6, 13 and 15
+
+# plot SIM1 and OTP on original UMAP to show enrichment in unknown clusters
+FeaturePlot(nuclei_dev, features = c("SIM1", "OTP"), cols = c("grey80", "#7656A8"), keep.scale = "all", order = TRUE,  pt.size = 0.01) +
+  plot_layout(guides = "collect") &
+  guides(colour = guide_colourbar(title = "Expression")) &
+  theme_void() &
+  theme(plot.title = element_text(size = 8, face = "bold", hjust = 0.5),
+        legend.position = "right",
+        legend.title = element_text(size = 7),
+        legend.text = element_text(size = 7),
+        legend.key.height = unit(4, "mm"),
+        legend.key.width = unit(4, "mm"), 
+        legend.box.spacing = unit(0, "pt"))
+
+ggsave("umap_SIM_OTP.tiff", height = 2.8, width = 4.5, dpi = 600, compression = "lzw")
+
+# set idents as seurat clusters
+unresolved_dev <- SetIdent(unresolved_dev, value = "seurat_clusters")
+
+# calculate the median UMAP position of each cluster
+cluster_centres <- as.data.frame(Embeddings(unresolved_dev, reduction = "umap"))
+
+colnames(cluster_centres)[1:2] <- c("UMAP_1", "UMAP_2")
+
+cluster_centres$cluster <- as.character(unresolved_dev$seurat_clusters)
+
+cluster_centres <- cluster_centres %>%
+  group_by(cluster) %>%
+  summarise(UMAP_1 = median(UMAP_1), UMAP_2 = median(UMAP_2), .groups = "drop")
+
+# create base FeaturePlots
+plots <- FeaturePlot(unresolved_dev, features = c("SIM1", "OTP"), order = TRUE, pt.size = 0.01, combine = FALSE)
+
+# add labels, identical colour scales and formatting 
+plots <- lapply(plots, function(p) {
+  p + geom_text_repel(data = cluster_centres,
+      aes(x = UMAP_1, y = UMAP_2, label = cluster), inherit.aes = FALSE, size = 2.5, colour = "black", box.padding = 0.2, min.segment.length = 0) +
+    scale_colour_gradient( low = "grey90", high = "#7656A8", limits = c(0, 4), oob = scales::squish, name = "Expression\nlevel") +
+    theme_void() +
+    theme(plot.title = element_text(size = 8, face = "bold",hjust = 0.5),
+          legend.title = element_text(size = 7),
+          legend.text = element_text(size = 7),
+          legend.key.height = unit(4, "mm"),
+          legend.key.width = unit(4, "mm"),
+          legend.box.spacing = unit(0, "pt"))
+  })
+
+# combine and collect the legends
+unresolved_lineage_plot <- wrap_plots(plots, ncol = 2, guides = "collect") & 
+  theme(legend.position = "right")
+
+unresolved_lineage_plot
+
+ggsave("unresolved_SIM1OTP_umap.tiff", unresolved_lineage_plot, height = 3.5, width = 6, dpi = 600, compression = "lzw")
+
+# add PVN labels to these clusters in a new column in metadata
+nuclei_dev$NEN_region <- as.character(nuclei_dev$cell_type)
+PVN_cells <- Cells(unresolved_dev)[as.character(unresolved_dev$seurat_clusters) %in% c("2", "5", "6", "13", "15")]
+nuclei_dev@meta.data[PVN_cells, "NEN_region"] <- "PVN"
+nuclei_dev$NEN_region <- factor(nuclei_dev$NEN_region)
+
+# neuroendocrine co-markers in the PVN
+FeaturePlot(unresolved_dev, features = c("NR3C1", "SCGN", "AGTR1", "TAC1", "TH", "ADARB2", "CALB1", "KCNMB4", "FOXP1",
+                                  "THRB", "NFIB", "CALB2", "SFRP2", "OMP", "UCN3", "GHRH"))
+ggsave("UMAP_unresolved_neuroendocrine.png", height = 20, width = 25, dpi = 300)
+
+VlnPlot(unresolved_dev, features = c("NR3C1", "SCGN", "PCSK1", "PCSK2", "AGTR1", "TAC1", "TH", "ADARB2", "CALB1", "KCNMB4", "FOXP1",
+                              "THRB", "NFIB", "CALB2", "SFRP2","OMP", "UCN3", "GHRH"))
+ggsave("vln_unresolved_neuroendocrine.png", height = 20, width = 25)
+
+# exlcuding preautonomic ADARB2+ neuropeptidergic clusters
+VlnPlot(unresolved_dev, features = c("ADARB2", "RELN", "SNCA", "NTNG1", "CACNA1G"),
+        group.by = "seurat_clusters", pt.size = 0, stack = TRUE, flip = TRUE)
+
 # check number and proportion of rare populations in each cluster
 table(PVN_dev$seurat_clusters[WhichCells(PVN_dev, expression = CRH > 0, slot = "counts")])
 100 * table(PVN_dev$seurat_clusters[WhichCells(PVN_dev, expression = CRH > 0, slot = "counts")]) /
@@ -258,6 +373,8 @@ nuclei_dev$NEN_type[colnames(nuclei_dev) %in%
 nuclei_dev$NEN_type[colnames(nuclei_dev) %in% 
                       colnames(tuberal_dev)[tuberal_dev$seurat_clusters %in% c(8)]] <- "NEN"
 
+nuclei_dev$NEN_type[colnames(nuclei_dev) %in% 
+                      colnames(unresolved_dev)[unresolved_dev$seurat_clusters %in% c(2, 6, 15)]] <- "NEN"
 
 # number of NENs there are
 table(nuclei_dev$NEN_type)
@@ -269,7 +386,16 @@ nuclei_dev$NEN_subtype[colnames(nuclei_dev) %in%
                          colnames(PVN_dev)[PVN_dev$seurat_clusters %in% 5]] <- "AVP-CRH"
 
 nuclei_dev$NEN_subtype[colnames(nuclei_dev) %in% 
+                         colnames(unresolved_dev)[unresolved_dev$seurat_clusters %in% 15]] <- "AVP-CRH"
+
+nuclei_dev$NEN_subtype[colnames(nuclei_dev) %in% 
                          colnames(PVN_dev)[PVN_dev$seurat_clusters %in% 13]] <- "AVP-OXT"
+
+nuclei_dev$NEN_subtype[colnames(nuclei_dev) %in% 
+                         colnames(unresolved_dev)[unresolved_dev$seurat_clusters %in% 6]] <- "AVP-OXT"
+
+nuclei_dev$NEN_subtype[colnames(nuclei_dev) %in% 
+                         colnames(unresolved_dev)[unresolved_dev$seurat_clusters %in% 2]] <- "OXT"
 
 nuclei_dev$NEN_subtype[colnames(nuclei_dev) %in% 
                          colnames(PVN_dev)[PVN_dev$seurat_clusters %in% c(8, 10)]] <- "TRH"
@@ -284,73 +410,50 @@ nuclei_dev$NEN_subtype[colnames(nuclei_dev) %in%
 table(nuclei_dev$NEN_subtype)
 
 # pie chart for global proportion of NENs and non-NENs within hypothalamic nuclei
-NEN_summary <- nuclei_dev@meta.data %>%
-  count(NEN_type, name = "cell_count")
+NEN_subtype_summary <- nuclei_dev@meta.data %>%
+  filter(NEN_type == "NEN", !is.na(NEN_subtype), NEN_subtype != "non_NEN") %>%
+  count(NEN_subtype, name = "cell_count") %>%
+  mutate(percentage = cell_count / sum(cell_count) * 100,
+         NEN_subtype = factor(NEN_subtype, levels = c("AVP-CRH", "AVP-OXT", "OXT", "TRH", "GHRH"))) %>%
+  arrange(NEN_subtype)
 
-NEN_summary_pie <- NEN_summary %>%
-  mutate(percentage = cell_count / sum(cell_count) * 100)
-
-ggplot(NEN_summary_pie, aes(x = "", y = percentage, fill = NEN_type)) +
+ggplot(NEN_subtype_summary, aes(x = "", y = percentage, fill = NEN_subtype)) +
   geom_col(width = 1) +
-  geom_text(aes(x = 1.6, label = paste0(round(percentage, 1), "%")),
-            position = position_stack(vjust = 0.5),
-            size = 2.5
-  ) +
+  geom_text(aes(x = 1.7, label = paste0(round(percentage, 1), "%")), position = position_stack(vjust = 0.5), size = 2.5) +
   coord_polar(theta = "y", clip = "off") +
-  scale_fill_manual(values = c("NEN" = "#A995C9", "non_NEN" = "grey85")) +
+  scale_fill_manual(values = c("AVP-CRH" = "#A995C9", "AVP-OXT" = "#78A8D1", "OXT" = "#D78FA9", "TRH" = "#C5A04A", "GHRH" = "#5FA9A2")) +
   theme_void() +
-  theme(legend.position = "none")
-
-ggsave("NEN_pie_proportions.tiff", height = 1.5, width = 1.5, dpi = 600, compression = "lzw")
-
-# stacked bar plot per region of NENs vs non-NENs
-NEN_region_summary <- nuclei_dev@meta.data %>%
-  filter(cell_type %in% c("PVN", "ARC", "Tuberal")) %>%
-  count(cell_type, NEN_type, name = "cell_count") %>%
-  group_by(cell_type) %>%
-  mutate(percentage = 100 * cell_count / sum(cell_count)) %>%
-  ungroup()
-
-NEN_region_summary$cell_type <- factor(NEN_region_summary$cell_type, levels = c("PVN", "ARC", "Tuberal"))
-
-ggplot(NEN_region_summary, aes(x = cell_type, y = percentage, fill = NEN_type)) +
-  geom_col(width = 0.7) +
-  coord_flip() +
-  scale_y_continuous(limits = c(0, 100), expand = c(0, 0)) +
-  scale_fill_manual( values = c("NEN" = "#A995C9", "non_NEN" = "grey85")) +
-  labs(x = NULL,y = "Percentage of cells (%)") +
-  theme_classic() +
-  theme(axis.text = element_text(size = 8),
-        axis.title = element_text(size = 8),
-        axis.line = element_line(linewidth = 0.3),
+  theme(legend.title = element_blank(),
         legend.text = element_text(size = 7),
-        legend.title = element_blank(),
-        legend.box.spacing = unit(0, "pt"),
-        legend.key.size = unit(0.3, "cm"))
+        legend.key.size = unit(3, "mm"),
+        legend.box.spacing = unit(0, "pt"))
 
-ggsave("NEN_per_region.tiff", height = 1.5, width = 2.6, dpi = 600, compression = "lzw")
+ggsave("NEN_pie_proportions.tiff", height = 2.5, width = 2.5, dpi = 600, compression = "lzw")
 
 # set order
 nuclei_dev$NEN_subtype <- factor(nuclei_dev$NEN_subtype,
-                               levels = c("AVP-CRH", "AVP-OXT", "TRH", "GHRH", "non_NEN"))
+                               levels = c("AVP-CRH", "AVP-OXT", "OXT", "TRH", "GHRH", "non_NEN"))
 
 # violin plot of neuropeptides and markers
-NEN_violin <- VlnPlot(subset(nuclei_dev, subset = NEN_type == "NEN"),
-  features = c("AVP", "CRH", "OXT", "TRH", "GHRH",
-               "FOXP1", "NR3C1", "ADARB2", "KCNMB4", "NFIB", "GAL", "FOXP2", "GSX1"),
-  group.by = "NEN_subtype"
-  cols = c(rep("#A995C9", 5), rep("#5FA9A2", 8)),
-  pt.size = 0, stack = TRUE, flip = TRUE) +
-  NoLegend() +
-  theme(axis.line = element_blank(),
-        axis.ticks = element_blank(),
-        axis.text = element_text(size = 8),
-        axis.title = element_text(size = 8),
-        axis.title.x = element_blank(),
-        panel.border = element_blank(),
-        strip.text.y.right = element_text(size = 8, face = "plain"))
+DotPlot(nuclei_dev, assay = "RNA", group.by = "NEN_subtype",
+        features = c("GSX1", "FOXP2", "GAL", "NFIB", "KCNMB4", "CALB1", "TAC1", "FOXP1", "NR3C1", "GHRH", "TRH", "OXT", "CRH", "AVP"
+        ),
+        dot.scale = 3, cols = c("grey100", "#7656A8")) +
+  coord_flip() +
+  guides(colour = guide_colourbar(title = "Average\nexpression"),
+         size = guide_legend(title = "Percent\nexpressed")) +
+  theme_bw() +
+  theme(axis.text.x = element_text(size = 7, angle = 45, hjust = 1),
+        axis.text.y = element_text(size = 7, face = "italic"),
+        axis.title = element_blank(),
+        legend.title = element_text(size = 7),
+        legend.text = element_text(size = 7),
+        legend.key.size = unit(3, "mm"),
+        legend.key.height = unit(4, "mm"),
+        legend.spacing.y = unit(0, "mm"),
+        legend.box.spacing = unit(0, "pt"),
+        panel.grid = element_blank(),
+        panel.heights = unit(14 * 0.5, "cm"),
+        panel.widths = unit(length(unique(seurat_dev$cell_type)) * 0.3, "cm"))
 
-NEN_violin$layers[[1]]$aes_params$linewidth <- 0.3
-NEN_violin
-
-ggsave("NEN_violin.tiff", height = 4, width = 3, dpi = 600, compression = "lzw")
+ggsave("NEN_dotplot.tiff", height = 3.4, width = 2.9, dpi = 600, compression = "lzw")
