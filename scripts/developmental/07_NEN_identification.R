@@ -453,7 +453,7 @@ DotPlot(nuclei_dev, assay = "RNA", group.by = "NEN_subtype",
         legend.spacing.y = unit(0, "mm"),
         legend.box.spacing = unit(0, "pt"),
         panel.grid = element_blank(),
-        panel.heights = unit(14 * 0.5, "cm"),
+        panel.heights = unit(10 * 0.5, "cm"),
         panel.widths = unit(length(unique(seurat_dev$cell_type)) * 0.3, "cm"))
 
 ggsave("NEN_dotplot.tiff", height = 3.4, width = 2.9, dpi = 600, compression = "lzw")

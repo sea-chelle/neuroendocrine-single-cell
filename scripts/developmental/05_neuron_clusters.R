@@ -1,6 +1,7 @@
 # loading required packages
 library(here)
 library(Seurat)
+library(harmony)
 library(tidyverse)
 library(scales)
 
@@ -19,22 +20,27 @@ LabelPoints(plot = VariableFeaturePlot(neuron_dev),
             repel = TRUE, xnudge = 0, ynudge = 0)
 
 # continue with standard seurat workflow
-neuron_dev <- ScaleData(neuron_dev,
-                        vars.to.regress = c("S.Score", "G2M.Score", "percent.mt"))
+neuron_dev <- ScaleData(neuron_dev, vars.to.regress = c("S.Score", "G2M.Score", "percent.mt"))
 neuron_dev <- RunPCA(neuron_dev, features = VariableFeatures(object = neuron_dev))
-ElbowPlot(neuron_dev)
+ElbowPlot(neuron_dev, reduction = "pca", ndims = 50)
+
+# run harmony for batch correction
+neuron_dev <- RunHarmony(neuron_dev, group.by.vars = "dataset")
 
 # UMAP dimensionality reduction clusters
-neuron_dev <- FindNeighbors(neuron_dev, dims = 1:30)
+neuron_dev <- FindNeighbors(neuron_dev, reduction = "harmony", dims = 1:40)
 neuron_dev <- FindClusters(neuron_dev, resolution = 0.5)
-neuron_dev <- RunUMAP(neuron_dev, dims = 1:30)
+neuron_dev <- RunUMAP(neuron_dev, reduction = "harmony", dims = 1:40)
 
 # visualising clusters
 DimPlot(neuron_dev, reduction = "umap", group.by = "seurat_clusters", label = TRUE)
+ggsave("UMAP_neuron_unannotated.png", height = 7, width = 8)
 
 # looking at cluster sizes
 table(neuron_dev@meta.data$seurat_clusters) 
-ggsave("UMAP_neuron_unannotated.png", height = 7, width = 8)
+
+# save unannotated seurat object
+saveRDS(neuron_dev, here("r_obj", "neuron_dev_unannotated.rds"))
 
 # glutamageric markers
 FeaturePlot(neuron_dev, 
@@ -86,7 +92,6 @@ VlnPlot(neuron_dev,
         pt.size = 0)
 ggsave("violin_matureneuron_marker.png", height = 10, width = 25, dpi = 300)
 
-
 # find differentially expressed genes from each cell type
 neuron_dev_markers <- FindAllMarkers(neuron_dev, 
                                      only.pos = TRUE, 
@@ -100,21 +105,19 @@ top10_markers <- function(x){
   }
 
 # create df of top 10 markers for each cluster
-top10_markers_neuron_df <- map_dfr(0:33, top10_markers)
+top10_markers_neuron_df <- map_dfr(0:32, top10_markers)
 
 # save as .csv file
-write.csv(top10_markers_neuron_df, here("csv", "neuron_dev_top10_markers.csv"))
+write.csv(top10_markers_neuron_df, here("csv", "top10_markers_neuron_dev.csv"))
 
 # renaming cluster numbers to cell types
-new_cluster_ids_neuron <- c("Immature", "Immature", "Immature", "Other", "GABAergic", "Glutamatergic", "GABAergic", "Histaminergic", "GABAergic", 
-                            "GABAergic", "GABAergic", "Glutamatergic", "Glutamatergic", "GABAergic", "GABAergic", "Glutamatergic", "Glutamatergic", 
-                            "Glutamatergic", "Other", "Glutamatergic", "GABAergic", "Histaminergic", "Glutamatergic", "GABAergic", "Glutamatergic", 
-                            "GABAergic", "Glutamatergic", "GABAergic", "Glutamatergic", "GABAergic", "GABAergic", "Immature", "Glutamatergic", 
-                            "GABAergic")
+new_cluster_ids_neuron <- c("Immature", "Immature", "Glutamatergic", "Immature", "GABAergic", "GABAergic", "Glutamatergic", "GABAergic", "GABAergic", "GABAergic",
+                            "Histaminergic", "GABAergic", "Glutamatergic", "GABAergic", "GABAergic", "Other", "GABAergic", "Glutamatergic", "Glutamatergic", "Glutamatergic",
+                            "Other", "Other", "Histaminergic", "GABAergic", "Glutamatergic", "Other", "GABAergic", "Glutamatergic", "Glutamatergic", "GABAergic",
+                            "Glutamatergic", "Other", "GABAergic")
 
 names(new_cluster_ids_neuron) <- levels(neuron_dev)
 neuron_dev <- RenameIdents(neuron_dev, new_cluster_ids_neuron)
-
 
 # visualising clusters after cell-type identification
 neuron_dev@meta.data$"cell_type" <- as.factor(neuron_dev@active.ident)
@@ -129,7 +132,8 @@ DimPlot(neuron_dev, reduction = "umap", group.by = "cell_type", label = FALSE, p
         legend.text = element_text(size = 7),
         legend.key.height = unit(4, "mm"),
         legend.box.spacing = unit(0, "pt"))
-ggsave("umap_neuron_annotated.tiff", height = 3, width = 3.5, dpi = 600, compression = "lzw")
+
+ggsave("umap_neuron_annotated.tiff", height = 2.5, width = 3.3, dpi = 600, compression = "lzw")
 
 # set order
 neuron_dev$cell_type <- factor(neuron_dev$cell_type,
@@ -140,7 +144,7 @@ DotPlot(neuron_dev, assay = "RNA", group.by = "cell_type",
         features = c("HDC", # histaminergic
           "ARX", "DLX2","GAD2", "SLC32A1", # GABAergic
           "SLC17A6", # glutamatergic
-          "MAP2", "SYP", "STMN2", "TUBB3", # neuronal
+          "SNAP25", "MAP2", "SYP", "STMN2", "TUBB3", # neuronal
           "VIM", "HES1" # immature neuronal
           ),
         dot.scale = 3, cols = c("grey100", "#7656A8")) +
@@ -158,7 +162,10 @@ DotPlot(neuron_dev, assay = "RNA", group.by = "cell_type",
         legend.spacing.y = unit(0, "mm"),
         legend.box.spacing = unit(0, "pt"),
         panel.grid = element_blank(),
-        panel.heights = unit(12 * 0.5, "cm"),
+        panel.heights = unit(13 * 0.3, "cm"),
         panel.widths = unit(length(unique(neuron_dev$cell_type)) * 0.5, "cm"))
 
-ggsave("major_marker_dotplot.tiff", height = 3, width = 2.1, dpi = 600, compression = "lzw")
+ggsave("major_marker_dotplot.tiff", height = 2.6, width = 2.1, dpi = 600, compression = "lzw")
+
+# save annotated Seruat object
+saveRDS(neuron_dev, here("r_obj", "neuron_dev.rds"))

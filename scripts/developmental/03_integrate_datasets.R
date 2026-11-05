@@ -1,10 +1,15 @@
 # load required packages
 library(here)
+library(tidyverse)
 library(Seurat)
 library(harmony)
 
 # set working directory
 setwd(here("r_obj"))
+
+# add dataset metadata
+seurat_herb$dataset <- "herb"
+seurat_zhou$dataset <- "zhou"
 
 # merge herb and zhou datasets
 seurat_dev <- merge(seurat_herb, seurat_zhou, 
@@ -32,30 +37,15 @@ head(seurat_dev@meta.data)
 seurat_dev <- ScaleData(seurat_dev, vars.to.regress = c("S.Score", "G2M.Score", "percent.mt"))
 seurat_dev <- RunPCA(seurat_dev, features = VariableFeatures(object = seurat_dev))
 ElbowPlot(seurat_dev)
-
-# extract cell names
-cell_names <- rownames(seurat_dev@meta.data)
-
-# extract the dataset from the cell name and put in a new column called dataset in metadata
-seurat_dev$dataset <- sub("_.*", "", cell_names)
-
-# check that the dataset column has been added
-head(seurat_dev@meta.data)
-table(seurat_dev$dataset)
   
 # run harmony for data integration and batch correction
-seurat_dev <- RunHarmony(seurat_dev, group.by.vars = c("dataset", "sample"))
-
-# create donor column
-seurat_dev$donor <- as.character(seurat_dev$sample)
-
-# collapse Zhou dissections from the same biological donor
-seurat_dev$donor[seurat_dev$dataset == "zhou"] <- sub("_(anterior|medial|posterior|whole)_(male|female)$",
-                                                      "",
-                                                      seurat_dev$sample[seurat_dev$dataset == "zhou"])
+seurat_dev <- RunHarmony(seurat_dev, group.by.vars = "dataset")
 
 # save integrated seurat object
 saveRDS(seurat_dev, "seurat_dev.rds")
 
-# remove unecessary objects
-rm("seurat_herb", "seurat_zhou", "cell_names")
+# remove everything except seurat_dev
+rm(list = setdiff(ls(envir = .GlobalEnv, all.names = TRUE), "seurat_dev"), envir = .GlobalEnv)
+
+# request release of unused memory
+gc(full = TRUE)

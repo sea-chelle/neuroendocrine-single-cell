@@ -175,7 +175,7 @@ write.csv(top10_markers_df, here("csv", "major_top10_markers.csv"))
 
 # renaming cluster to cell types
 new_cluster_ids <- c("Neuron", "Astrocyte", "OPC", "Neuron", "Neuron", "Astrocyte", "RG", "Microglia", "Neuron", "RG",
-                     "RG", "IPC", "Neuron", "Neuroepithelial", "Oligodendrocyte", "Pericyte", "Neuron", "Ependymal", "Endothelial", 
+                     "RG", "IPC", "Neuron", "IPC", "Oligodendrocyte", "Pericyte", "Neuron", "Ependymal", "Endothelial", 
                      "Cycling progenitor", "Ependymal", "Cycling progenitor", "Neuroepithelial", "Ependymal", "VLMC", "Cycling progenitor", 
                      "OPC", "Microglia", "Neuron", "Astrocyte", "Astrocyte", "Neuron", "Cycling progenitor", "Neuron", "Macrophage", "Neuron", 
                      "Neuron", "Neuron", "Neuron", "Cycling progenitor", "Cycling progenitor", "Tanycyte")
@@ -202,10 +202,11 @@ DimPlot(seurat_dev, reduction = "umap", group.by = "cell_type", label = FALSE, p
   theme_void() +
   theme(plot.title = element_blank(), 
         legend.text = element_text(size = 7),
-        legend.key.height = unit(4, "mm"),
+        legend.key.height = unit(3, "mm"),
+        legend.key.width = unit(0, "mm"),
         legend.box.spacing = unit(0, "pt"))
 
-ggsave("umap_major_annotated.tiff", height = 2.5, width = 3.2, dpi = 600, compression = "lzw")
+ggsave("umap_major_annotated.tiff", height = 2.8, width = 3., dpi = 600, compression = "lzw", bg = "transparent")
 
 # plot dotplot of markers
 DotPlot(seurat_dev, assay = "RNA", group.by = "cell_type",
@@ -243,7 +244,7 @@ DotPlot(seurat_dev, assay = "RNA", group.by = "cell_type",
         panel.heights = unit(43 * 0.3, "cm"),
         panel.widths = unit(length(unique(seurat_dev$cell_type)) * 0.4, "cm"))
 
-ggsave("major_marker_dotplot.tiff", height = 6, width = 3.5, dpi = 600, compression = "lzw")
+ggsave("major_marker_dotplot.tiff", height = 6, width = 3.5, dpi = 600, compression = "lzw", bg = "transparent")
 
 # remove objects
-rm(new_cluster_id)
+rm(new_cluster_ids, major_markers, top10_markers)

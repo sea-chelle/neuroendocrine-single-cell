@@ -179,7 +179,7 @@ write.csv(top10_markers_neuroendocrine_df, here("csv", "nuclei_dev_top10_markers
 
 # renaming cluster numbers to cell types
 new_cluster_ids_nuclei <- c("Thalamus", "AH", "Tuberal", "Unresolved", "Unresolved", "Unresolved", "TMN", "PVN", "POA", "VMH",
-                            "PMN", "Unresolved", "Prethalamus", "ARC", "PH", "Thalamus", "Unresolved", "ARC", "Tuberal", "MB",
+                            "PMN", "Unresolved", "Prethalamus", "ARC", "PH", "Thalamus", "Unresolved", "ARC", "Tuberal", "Unresolved",
                             "TMN", "PVN", "LH", "ARC", "Telencephalic", "SCN", "PVN", "Prethalamus", "PH", "Thalamus",
                             "SMN", "Thalamus", "Telencephalic", "MB", "Telencephalic")
 
@@ -205,7 +205,7 @@ DimPlot(nuclei_dev, reduction = "umap", group.by = "cell_type", label = FALSE, p
 
 ggsave("umap_nuclei_annotated.tiff", height = 2.5, width = 3.1, dpi = 600, compression = "lzw")
 
-DimPlot(nuclei_dev, reduction = "umap", group.by = "cell_type", label = FALSE, pt.size = 0.01) +
+DimPlot(nuclei_dev, reduction = "umap", group.by = "cell_type", label = FALSE, pt.size = 0.0001) +
   scale_colour_manual(values = c("AH" = "#DD805E", "ARC" = "#D78FA9", "LH" = "#D5A928", "MB" = "#B85F78", "PH" = "#B85F5A", 
                                  "PMN" = "#3F8C5A", "POA" = "#78A8D1", "Prethalamus" = "#587F9E",  "PVN" = "#A995C9", "SCN" = "#B2A52E", 
                                  "SMN" = "#9BCB9A", "Telencephalic" = "#755333",  "Thalamus" = "#5FA9A2", "TMN" = "#765996", 
@@ -216,7 +216,7 @@ DimPlot(nuclei_dev, reduction = "umap", group.by = "cell_type", label = FALSE, p
         legend.text = element_text(size = 7),
         legend.key.height = unit(4, "mm"),
         legend.box.spacing = unit(0, "pt"))
-ggsave("umap_nuclei_annotated.tiff", height = 2.5, width = 3.1, dpi = 600, compression = "lzw")
+ggsave("umap_nuclei_annotated.tiff", height = 2.8, width = 3, dpi = 600, compression = "lzw")
 
 table(nuclei_dev@meta.data$cell_type) # looking at cluster sizes
 
