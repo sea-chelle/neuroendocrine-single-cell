@@ -8,14 +8,20 @@ library(grid)
 # set working directory
 setwd(here("plots"))
 
-# combine TFs and simplify the labels used in the figure
+# labels in the required display order
+tf_program_levels <- c("OXT/AVP-OXT", "TRH/AVP-CRH", "NEN", "non-NEN", "All terminals")
+
+# combine TFs and create short plotting labels
 tf_heatmap_genes <- bind_rows(tf_divergent_genes, tf_shared_genes) %>%
   distinct(gene, .keep_all = TRUE) %>%
-  mutate(display_program = recode(terminal_program, 
-                                  "Strong OXT/AVP-OXT-enriched" = "OXT/AVP-OXT-enriched",
-                                  "Strong TRH/AVP-CRH-enriched" = "TRH/AVP-CRH-enriched",
-                                  "Strong non-NEN-enriched" = "non-NEN-enriched"),
+  mutate(display_program = recode(terminal_program,
+                                  "Strong OXT/AVP-OXT-enriched" = "OXT/AVP-OXT",
+                                  "Strong TRH/AVP-CRH-enriched" = "TRH/AVP-CRH",
+                                  "Shared NEN-enriched" = "NEN",
+                                  "non-NEN-enriched" = "non-NEN",
+                                  "Shared across all terminals" = "All terminals"),
          display_program = factor(display_program, levels = tf_program_levels)) %>%
+  filter(gene %in% rownames(terminal_mean_expression), !is.na(display_program)) %>%
   arrange(display_program)
 
 # retain genes present in the expression matrix
@@ -36,11 +42,11 @@ tf_expression_z <- tf_expression_z[keep_tf_genes, , drop = FALSE]
 tf_heatmap_genes <- tf_heatmap_genes[match(rownames(tf_expression_z), tf_heatmap_genes$gene), , drop = FALSE]
 
 # programme colours
-tf_programme_colours <- c("OXT/AVP-OXT-enriched" = "#A995C9",
-                          "TRH/AVP-CRH-enriched" = "#78A8D1",
-                          "Shared NEN-enriched" = "#D78FA9",
-                          "non-NEN-enriched" = "#5FA9A2",
-                          "Shared across all terminals" = "#C5A95A")
+tf_programme_colours <- c("OXT/AVP-OXT" = "#A995C9",
+                          "TRH/AVP-CRH" = "#78A8D1",
+                          "NEN" = "#D78FA9",
+                          "non-NEN" = "#5FA9A2",
+                          "All terminals" = "#C5A95A")
 
 # row annotation
 tf_row_annotation <- rowAnnotation(Programme = tf_heatmap_genes$display_program,
@@ -66,19 +72,17 @@ tf_heatmap <- Heatmap(tf_expression_z,
                       row_gap = unit(1.5, "mm"),
                       row_names_side = "right",
                       row_names_gp = gpar(fontsize = 7),
-                      column_names_centered = TRUE,
                       column_names_side = "bottom",
-                      column_names_rot = 0,
-                      column_names_gp = gpar(fontsize = 8),
-                      column_title = "Terminal PVN transcription factor programmes",
-                      column_title_gp = gpar(fontsize = 8, fontface = "bold"),
+                      column_names_gp = gpar(fontsize = 7),
                       heatmap_legend_param = list(title_gp = gpar(fontsize = 7),
                                                   labels_gp = gpar(fontsize = 7),
                                                   grid_width = unit(3, "mm"),
-                                                  grid_height = unit(3, "mm"),
+                                                  grid_height = unit(4, "mm"),
                                                   at = c(-1.2, 0, 1.2)))
 
+pdf(file = "terminal_PVN_TF_heatmap.pdf", width = 3.2, height = 6, useDingbats = FALSE)
 draw(tf_heatmap, merge_legends = TRUE, heatmap_legend_side = "right", annotation_legend_side = "right")
+dev.off()
 
 # programme labels displayed in the non-TF heatmap
 non_tf_program_levels <- c("OXT/AVP-OXT-enriched", "TRH/AVP-CRH-enriched", "Shared NEN-enriched", "non-NEN-enriched",
@@ -171,6 +175,7 @@ non_tf_heatmap <- Heatmap(non_tf_expression_z,
                                                       grid_height = unit(3, "mm"),
                                                       at = c(-1, 0, 1)))
 
+
 draw(non_tf_heatmap, merge_legends = TRUE, heatmap_legend_side = "right", annotation_legend_side = "right")
 
 # log-normalise the complete tradeSeq count matrix
@@ -211,24 +216,26 @@ plot_lineage_genes <- function(genes, plot_title = NULL, facet_ncol = 3)
   ggplot(plot_data, aes(x = normalised_pseudotime, y = expression, colour = lineage)) +
     geom_smooth(aes(weight = lineage_weight), method = "gam", formula = y ~ s(x, k = 6), se = FALSE, linewidth = 0.6) +
     facet_wrap(~ gene, scales = "free_y", ncol = facet_ncol) +
-    scale_colour_manual(values = c("OXT/AVP-OXT" = "#A995C9", "TRH/AVP-CRH" = "#78A8D1", "non-NEN" = "#D78FA9")) +
+    scale_colour_manual(values = c("OXT/AVP-OXT" = "#A995C9", "TRH/AVP-CRH" = "#78A8D1", "non-NEN" = "#D78FA9"),
+                        guide = guide_legend(nrow = 2, byrow = TRUE)) +
     labs(x = "Relative pseudotime", y = "Log-normalised expression", colour = "Lineage", title = plot_title) +
     theme_classic() +
     theme(strip.background = element_blank(),
           strip.text = element_text(face = "bold", size = 9),
-          plot.title = element_text(face = "bold", hjust = 0.5, size = 9),
-          axis.title = element_text(size = 8),
-          axis.text = element_text(size = 8),
+          axis.title = element_text(size = 7),
+          axis.text = element_text(size = 7),
           legend.position = "bottom",
-          legend.title = element_text(size = 7),
+          legend.title = element_blank(),
           legend.text = element_text(size = 7),
-          legend.margin = margin(b = 0),
-          legend.box.spacing = unit(0, "mm"),
+          legend.margin = margin(0, 0, 0, 0),
+          legend.box.spacing = unit(2, "mm"),
+          legend.key.height = unit(1, "mm"),
+          legend.spacing.y = unit(0, "mm"),
           axis.line = element_line(linewidth = 0.3),
           axis.ticks = element_line(linewidth = 0.3))
 }
 
 # plot final selected TFs
 headline_tf_genes <- c("NPAS4", "NR3C1", "NR3C2", "ISL1", "BCL6", "GTF2I")
-headline_tf_plot <- plot_lineage_genes(genes = headline_tf_genes, facet_ncol = 3)
-headline_tf_plot
+plot_lineage_genes(genes = headline_tf_genes, facet_ncol = 2)
+ggsave("fig5.6b_tradeseq_expression_smooth.tiff", height = 5, width = 3.1, dpi = 600, compression = "lzw")
