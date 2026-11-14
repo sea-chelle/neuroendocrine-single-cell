@@ -6,17 +6,15 @@ library(tidyverse)
 library(Matrix)
 
 # vreate a dedicated output directory for SCENIC
-scenic_output_dir <- file.path(here("results", "pySCENIC"))
+scenic_output_dir <- file.path(here("results", "pySCENIC", "dev"))
 dir.create(scenic_output_dir, recursive = TRUE, showWarnings = FALSE)
 
 # define all immature neurons
-immature_cells <- colnames(neuron_dev)[as.character(neuron_dev$cell_type) == "Immature"]
+immature_cells <- colnames(neuron_dev)[as.character(neuron_dev$cell_type) %in% "Immature"]
 
-# define mature PVN neurons
-pvn_cells <- colnames(nuclei_dev)[as.character(nuclei_dev$NEN_region) == "PVN"]
-
-# define mature ARC neurons
-arc_cells <- colnames(nuclei_dev)[as.character(nuclei_dev$NEN_region) == "ARC"]
+# define mature PVN and ARC neurons
+pvn_cells <- colnames(nuclei_dev)[nuclei_dev$NEN_region %in% "PVN"]
+arc_cells <- colnames(nuclei_dev)[nuclei_dev$NEN_region %in% "ARC"]
 
 # all mature neurons of interest
 mature_cells <- unique(c(pvn_cells, arc_cells))
@@ -32,35 +30,24 @@ mature_annotations <- nuclei_dev@meta.data %>%
             NEN_status_original = as.character(NEN_type),
             NEN_subtype = as.character(NEN_subtype))
 
-# extract metadata in exact scoring-matirx order
-scenic_metadata <- as.data.frame(seurat_dev@meta.data[scenic_scoring_cells, , drop = FALSE])
-
-# add cell names explicitly
-scenic_metadata$cell <- rownames(scenic_metadata)
-scenic_metadata <- scenic_metadata %>% 
-  relocate(cell) %>%
-  left_join(mature_annotations, by = "cell")
-
-# add the developmental stage
-scenic_metadata <-scenic_metadata %>%
-  mutate(developmental_stage = case_when(mature_region %in% c("PVN", "ARC") ~ "Mature neuron",
+# prepare metadata in scoring matrix order
+scenic_metadata <- seurat_dev@meta.data[scenic_scoring_cells, , drop = FALSE] %>%
+  as.data.frame() %>%
+  rownames_to_column("cell") %>%
+  left_join(mature_annotations, by = "cell") %>%
+  mutate(developmental_stage = case_when(cell %in% mature_cells ~ "Mature neuron",
                                          cell %in% immature_cells ~ "Immature neuron",
                                          as.character(seurat_clusters) == "22" ~ "Neuroepithelial/RG",
                                          as.character(seurat_clusters) %in% c("25", "32", "39", "40") ~ "Cycling progenitor",
                                          as.character(seurat_clusters) == "13" ~ "IPC",
-                                         TRUE ~ NA_character_),
+                                          TRUE ~ NA_character_),
          maturity = case_when(developmental_stage == "Mature neuron" ~ "Mature",
                               developmental_stage %in% c("Neuroepithelial/RG", "Cycling progenitor", "IPC", "Immature neuron") ~ "Developing",
                               TRUE ~ NA_character_),
          NEN_status = case_when(maturity == "Mature" & NEN_status_original == "NEN" ~ "NEN",
                                 maturity == "Mature" & NEN_status_original == "non_NEN" ~ "non-NEN",
                                 TRUE ~ NA_character_),
-         used_for_inference = cell %in% scenic_inference_cells)
-
-# create detailed groups
-scenic_metadata <-
-  scenic_metadata %>%
-  mutate(scenic_group = case_when(maturity == "Developing" ~ developmental_stage,
+         scenic_group = case_when(maturity == "Developing" ~ developmental_stage,
                                   mature_region == "PVN" & NEN_subtype == "OXT" ~ "PVN: OXT",
                                   mature_region == "PVN" & NEN_subtype == "AVP-OXT" ~ "PVN: AVP-OXT",
                                   mature_region == "PVN" & NEN_subtype == "TRH" ~ "PVN: TRH",
@@ -69,6 +56,9 @@ scenic_metadata <-
                                   mature_region == "ARC" & NEN_subtype == "GHRH" ~ "ARC: GHRH",
                                   mature_region == "ARC" & NEN_status == "non-NEN" ~ "ARC: non-NEN",
                                   TRUE ~ NA_character_))
+
+# inspect group composition
+table(scenic_metadata$scenic_group, useNA = "ifany")
 
 # sample up to 2,000 cells from each biological group
 set.seed(123)
@@ -81,15 +71,6 @@ scenic_inference_cells <- scenic_inference_metadata$cell
 # record inference membership in the complete metadata
 scenic_metadata <- scenic_metadata %>%
   mutate(used_for_inference = cell %in% scenic_inference_cells)
-
-# save the exact sorting and inference cell order
-writeLines(scenic_inference_cells, file.path(scenic_output_dir, "scenic_inference_cells.txt"))
-writeLines(scenic_scoring_cells, file.path(scenic_output_dir, "scenic_scoring_cells.txt"))
-
-# check final composition
-scenic_metadata %>%
-  dplyr::count(scenic_group, used_for_inference, name = "n_cells") %>%
-  arrange(scenic_group, desc(used_for_inference))
 
 # check number of cells in each group used for inference
 scenic_inference_metadata %>%
@@ -135,7 +116,7 @@ length(scenic_genes)
 scenic_inference_counts <- scenic_inference_counts[scenic_genes, , drop = FALSE]
 
 # complete matrix used for AUCell scoring
-scenic_scoring_counts <- scenic_raw_counts[scenic_genes, scenic_scoring_cells, drop = FALSE]
+scenic_scoring_counts <- scenic_raw_counts[, scenic_scoring_cells, drop = FALSE]
 
 # check final dimensions
 c(inference_genes = nrow(scenic_inference_counts), 
@@ -154,23 +135,30 @@ scenic_inference_metadata <- scenic_metadata %>%
 write_csv(scenic_metadata, file.path(scenic_output_dir, "pyscenic_scoring_metadata.csv"))
 write_csv(scenic_inference_metadata, file.path(scenic_output_dir, "pyscenic_inference_metadata.csv" ))
 write_csv(gene_filter_table, file.path(scenic_output_dir, "pyscenic_gene_filter.csv"))
-write_csv(gene_check_table, file.path(scenic_output_dir, "pyscenic_gene_check.csv"))
 
 # write and save filter paramters
-filter_parameters <- tibble(parameter = c("random_seed", "maximum_cells_per_group", "minimum_detection_fraction",
-                                          "minimum_detected_cells", "minimum_total_counts", "retained_genes",
-                                          "inference_cells", "scoring_cells",
-                                           value = c(123, 2000, minimum_detection_fraction, minimum_cells, minimum_total_counts,
-                                                     length(scenic_genes), length(scenic_inference_cells), length(scenic_scoring_cells))))
+filter_parameters <- tibble(parameter = c("random_seed", "maximum_cells_per_group", "minimum_detection_fraction", 
+                                          "minimum_detected_cells", "minimum_total_counts", "retained_genes", "inference_cells", "scoring_cells"),
+                            value = c(123, 2000, minimum_detection_fraction, minimum_cells, minimum_total_counts,
+                                      length(scenic_genes), length(scenic_inference_cells), length(scenic_scoring_cells)))
+
 
 write_csv(filter_parameters, file.path(scenic_output_dir, "pyscenic_filter_parameters.csv"))
 
-
 # save ordered gene and cell identifiers
-writeLines(scenic_genes, file.path(scenic_output_dir, "pyscenic_genes.txt"))
+writeLines(scenic_genes, file.path(scenic_output_dir, "pyscenic_inference_genes.txt"))
+writeLines(rownames(scenic_scoring_counts), file.path(scenic_output_dir, "pyscenic_scoring_genes.txt"))
 writeLines(scenic_inference_cells, file.path(scenic_output_dir, "pyscenic_inference_cells.txt"))
 writeLines(scenic_scoring_cells, file.path(scenic_output_dir, "pyscenic_scoring_cells.txt"))
 
 # export sparse matrices for Python 
 writeMM(scenic_inference_counts, file.path(scenic_output_dir, "pyscenic_inference_counts.mtx"))
 writeMM(scenic_scoring_counts, file.path(scenic_output_dir, "pyscenic_scoring_counts.mtx"))
+
+# check
+stopifnot(identical(colnames(scenic_inference_counts), scenic_inference_cells),
+          identical(colnames(scenic_scoring_counts), scenic_scoring_cells),
+          identical(scenic_metadata$cell, scenic_scoring_cells),
+          identical(scenic_inference_metadata$cell, scenic_inference_cells),
+          !anyNA(scenic_metadata$scenic_group),
+          !anyDuplicated(rownames(scenic_scoring_counts)))
