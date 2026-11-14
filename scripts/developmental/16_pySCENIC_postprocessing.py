@@ -6,10 +6,10 @@ from pyscenic.rss import regulon_specificity_scores
 
 # define directories
 root = Path("/home/sejj745/Scratch/pySCENIC")
-output = root / "output"
+output = root / "output" / "dev"
 
 # load cell metadata
-metadata = pd.read_csv(root / "input/pyscenic_scoring_metadata.csv", index_col="cell")
+metadata = pd.read_csv(root / "input/dev/pyscenic_scoring_metadata.csv", index_col="cell")
 
 # extract AUCell activity matrix
 with h5py.File(output / "pyscenic_scoring_auc.loom", "r") as f:
