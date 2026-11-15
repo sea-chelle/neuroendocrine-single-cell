@@ -61,8 +61,7 @@ immature_sampled_cells <- immature_meta %>%
   ungroup() %>%
   pull(cell)
 
-writeLines(sort(immature_sampled_cells),
-           file.path(table_dir, "immature_sampled_cells.txt"))
+writeLines(sort(immature_sampled_cells), file.path(here("csv", "immature_sampled_cells.txt")))
 
 # number of immature neurons retained
 length(immature_sampled_cells)
@@ -305,7 +304,6 @@ p_stage_pseudotime <- VlnPlot(PVN_trajectory_dev, features = "pseudotime",
                               group.by = "trajectory_stage", pt.size = 0) +
   NoLegend() + RotatedAxis()
 
-
 ggsave(file.path(figure_dir, "trajectory_umap_QC.pdf"),
        p_umap_overview, width = 14, height = 6)
 ggsave(file.path(figure_dir, "trajectory_graph_overview.pdf"),
@@ -314,11 +312,6 @@ ggsave(file.path(figure_dir, "trajectory_branches.pdf"),
        p_graph_branch, width = 7, height = 6)
 ggsave(file.path(figure_dir, "trajectory_stage_pseudotime.pdf"),
        p_stage_pseudotime, width = 7, height = 5)
-
-# retain TFs associated with the PVN trajectory
-trajectory_tfs <- trajectory_genes_filtered %>%
-  filter(gene %in% human_tfs) %>%
-  arrange(desc(morans_I))
 
 # reusable pseudotime-expression plotting function
 plot_pseudotime_genes <- function(genes, ncol = 4) {

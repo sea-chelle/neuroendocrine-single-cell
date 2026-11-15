@@ -11,7 +11,7 @@ library(ggraph)
 setwd(here("plots"))
 
 # specify directory for pySCENIC results
-scenic_output_dir <- here("results", "pySCENIC", "output")
+scenic_output_dir <- here("results", "pySCENIC", "output", "dev")
 
 # import per-cell AUCell regulon activity scores
 scenic_auc <- read_csv(file.path(scenic_output_dir, "pyscenic_auc_matrix.csv.gz"), show_col_types = FALSE)
@@ -46,21 +46,48 @@ scenic_development_master <- scenic_auc_development %>%
   pivot_longer(-developmental_group, names_to = "regulon", values_to = "mean_auc") %>%
   pivot_wider(names_from = developmental_group, values_from = mean_auc)
 
+# define developmental population order
+scenic_development_order <- c("Neuroepithelial/RG", "Cycling progenitor", "IPC", "Immature neuron",
+                              "PVN NEN", "PVN non-NEN", "ARC NEN", "ARC non-NEN")
+
+# convert mean AUCell values into a matrix
+scenic_development_matrix <- scenic_development_master %>%
+  column_to_rownames("regulon") %>%
+  as.matrix()
+
+# arrange populations in developmental order
+scenic_development_matrix <- scenic_development_matrix[, scenic_development_order, drop = FALSE]
+
+# calculate row-wise Z-scores
+scenic_development_scaled <- t(scale(t(scenic_development_matrix)))
+
+# rank regulons by population-specific activity
+scenic_development_ranking <- as.data.frame(scenic_development_scaled) %>%
+  rownames_to_column("regulon") %>%
+  pivot_longer(-regulon, names_to = "developmental_group", values_to = "z_score") %>%
+  group_by(developmental_group) %>%
+  arrange(desc(z_score), .by_group = TRUE) %>%
+  mutate(rank = row_number()) %>%
+  ungroup()
+
+# extract top 20 regulons per population
+scenic_development_top20 <- scenic_development_ranking %>%
+  filter(rank <= 20)
+
+scenic_development_top20 %>%
+  arrange(developmental_group, rank) %>%
+  print(n = Inf)
+
 # select representative TF regulons for the developmental heatmap
-scenic_development_selected <- c("EMX2(+)", "SOX2(+)", "PAX6(+)", "HMGA1(+)", "FOXM1(+)", "HES1(+)", "ASCL1(+)", "TCF4(+)", "RFX3(+)", "ATF2(+)", "ATF4(+)", "CREB3(+)",
-                                 "OTP(+)", "NEUROD1(+)", "EBF1(+)", "MESP1(+)", "NR2F6(+)", "THRA(+)", "KLF5(+)", "THRB(+)", "PBX1(+)", "GSX1(+)", "HMX2(+)", "DLX6(+)")
+scenic_development_selected <- c("SOX2(+)", "SOX9(+)", "PAX6(+)", "FOXM1(+)", "MYBL2(+)", "E2F1(+)", "ASCL1(+)", "RAX(+)",
+                                 "HES5(+)", "SOX21(+)", "ATF1(+)", "ZNF143(+)", "ONECUT2(+)", "THRA(+)", "NR2F6(+)", "OTP(+)", "POU3F2(+)",
+                                 "NEUROD1(+)", "HMX2(+)", "DLX2(+)", "GSX1(+)", "PBX1(+)", "NR3C1(+)", "THRB(+)")
 
-# define the order of cell populations along development
-scenic_development_order <- c("Neuroepithelial/RG", "Cycling progenitor", "IPC", "Immature neuron", "PVN NEN", "PVN non-NEN", "ARC NEN", "ARC non-NEN")
+# subset for selected TFs
+scenic_development_matrix_selected <- scenic_development_matrix[scenic_development_selected, scenic_development_order, drop = FALSE]
 
-# convert regulon activity into a numeric matrix
-scenic_development_matrix_selected <- scenic_development_master %>%
-  column_to_rownames("regulon") %>% as.matrix()
-
-scenic_development_matrix_selected <- scenic_development_matrix_selected[scenic_development_selected, scenic_development_order, drop = FALSE]
-
-# Z-score mean AUCell activity separately for each regulon (row)
-scenic_development_scaled_selected <- t(scale(t(scenic_development_matrix_selected)))
+# remove (+) from TF names
+rownames(scenic_development_scaled_selected) <- gsub("\\(\\+\\)", "", rownames(scenic_development_scaled_selected))
 
 # plot the developmental regulon activity heatmap
 pdf("scenic_dev_heatmap.pdf", height = 5, width = 6.27, useDingbats = FALSE)
@@ -86,13 +113,35 @@ scenic_NEN_master <- scenic_NEN_rss_balanced %>%
                                        `PVN non-NEN` > `PVN NEN` & `ARC non-NEN` > `ARC NEN` ~ "Shared non-NEN",
                                        TRUE ~ "Other"))
 
+# rank top 10 regulons for each NEN and non-NEN category
+bind_rows(scenic_NEN_master %>%
+            filter(identity_category == "Shared NEN") %>%
+            mutate(category = "Shared NEN", RSS = (`PVN NEN` + `ARC NEN`) / 2),
+          
+          scenic_NEN_master %>%
+            filter(identity_category == "Shared non-NEN") %>%
+            mutate(category = "Shared non-NEN", RSS = (`PVN non-NEN` + `ARC non-NEN`) / 2),
+          
+          scenic_NEN_master %>%
+            select(regulon, `PVN NEN`, `ARC NEN`, `PVN non-NEN`, `ARC non-NEN`) %>%
+            pivot_longer(-regulon, names_to = "category", values_to = "RSS")) %>%
+  
+  group_by(category) %>%
+  slice_max(RSS, n = 20, with_ties = FALSE) %>%
+  arrange(category, desc(RSS)) %>%
+  mutate(rank = row_number()) %>%
+  ungroup() %>%
+  select(category, regulon, RSS, rank) %>%
+  print(n = Inf)
+
 # select shared and region-associated NEN/non-NEN regulons
-scenic_NEN_selected <- list("Shared NEN" = c("DLX2(+)", "DLX5(+)", "EGR1(+)", "FOSB(+)"),
-                            "Shared non-NEN" = c("EBF1(+)", "NFIA(+)", "PLAGL1(+)"),
-                            "PVN NEN" = c("ONECUT2(+)", "NR2F6(+)", "JUNB(+)", "THRA(+)"),
-                            "ARC NEN" = c("GSX1(+)", "HMX2(+)", "FOXO1(+)", "THRB(+)"),
+scenic_NEN_selected <- list("Shared NEN" = c("DLX2(+)", "DLX5(+)", "JUNB(+)"),
+                            "Shared non-NEN" = c("EBF1(+)", "PBX1(+)", "NEUROD1(+)"),
+                            "PVN NEN" = c("ONECUT2(+)", "EGR1(+)", "THRA(+)"),
+                            "ARC NEN" = c("GSX1(+)", "HMX2(+)", "FOXO1(+)"),
                             "PVN non-NEN" = c("NR2F1(+)", "POU3F2(+)", "OTP(+)"),
-                            "ARC non-NEN" = c("AR(+)", "NR3C1(+)", "CLOCK(+)", "FOXO3(+)"))
+                            "ARC non-NEN" = c("AR(+)", "NR3C1(+)", "KLF5(+)"))
+
 
 # prepare the balanced RSS matrix for selected neuronal populations
 scenic_NEN_matrix <- scenic_NEN_master %>%
@@ -124,22 +173,22 @@ Heatmap(scenic_NEN_scaled,
                                     at = c(-2, 0, 2)))
 dev.off()
 
-# top 15 regulons by RSS for each NEN subtype
+# top 20 regulons by RSS for each NEN subtype
 scenic_mature_rss_balanced %>%
   select(regulon, `PVN: AVP-CRH`, `PVN: AVP-OXT`,
          `PVN: OXT`, `PVN: TRH`, `ARC: GHRH`) %>%
   pivot_longer(-regulon, names_to = "subtype", values_to = "RSS") %>%
   group_by(subtype) %>%
-  slice_max(RSS, n = 15, with_ties = FALSE) %>%
+  slice_max(RSS, n = 20, with_ties = FALSE) %>%
   arrange(subtype, desc(RSS)) %>%
-  print(n = 75)
+  print(n = Inf)
 
 # select subtype-associated regulons to plot
-scenic_subtype_selected <- list("AVP-CRH" = c("POU6F1(+)", "FOSL2(+)", "GMEB2(+)", "NR3C1(+)"),
-                                "AVP-OXT" = c("IRF1(+)", "EGR1(+)", "JUNB(+)", "ATF3(+)", "THRA(+)"),
+scenic_subtype_selected <- list("AVP-CRH" = c("POU6F1(+)", "FOSL2(+)", "BCL6(+)", "NR3C1(+)", "THRB(+)"),
+                                "AVP-OXT" = c("IRF1(+)", "EGR1(+)", "JUNB(+)", "ONECUT2(+)", "THRA(+)"),
                                 "OXT" = c("NR2F6(+)", "NR2F2(+)", "KMT2B(+)"),
                                 "TRH" = c("UNCX(+)", "NR2F1(+)", "NEUROD1(+)", "OTP(+)"),
-                                "GHRH" = c("GSX1(+)", "HMX2(+)", "FOXO1(+)", "DLX6(+)", "THRB(+)"))
+                                "GHRH" = c("GSX1(+)", "HMX2(+)", "FOXO1(+)", "DLX1(+)"))
 
 # define subtype order for the mature-neuron heatmaps
 scenic_subtype_order <- c("PVN: AVP-CRH", "PVN: AVP-OXT", "PVN: OXT", "PVN: TRH", "ARC: GHRH")
@@ -175,54 +224,12 @@ Heatmap(scenic_subtype_scaled,
                                     at = c(-2, 0, 2)))
 dev.off()
 
-# calculate mean per-cell AUCell activity for the selected regulons
-scenic_subtype_activity <- scenic_auc_annotated %>%
-  filter(scenic_group %in% scenic_subtype_order) %>%
-  select(scenic_group, all_of(unlist(scenic_subtype_selected))) %>%
-  group_by(scenic_group) %>%
-  summarise(across(where(is.numeric), ~ mean(.x, na.rm = TRUE)), .groups = "drop") %>%
-  pivot_longer(-scenic_group, names_to = "regulon", values_to = "AUCell") %>%
-  pivot_wider(names_from = scenic_group, values_from = AUCell)
-
-# convert mean AUCell scores to a matrix in the desired regulon order
-scenic_subtype_AUC_matrix <- scenic_subtype_activity %>%
-  column_to_rownames("regulon") %>% as.matrix()
-scenic_subtype_AUC_matrix <- scenic_subtype_AUC_matrix[unlist(scenic_subtype_selected), scenic_subtype_order, drop = FALSE]
-
-# shorten subtype names for heatmap
-colnames(scenic_subtype_AUC_matrix) <- sub("^PVN: |^ARC: ", "", colnames(scenic_subtype_AUC_matrix))
-colnames(scenic_subtype_AUC_matrix) <- c("\nAVP-\nCRH", "\nAVP-\nOXT", "OXT", "TRH", "GHRH")
-
-# Z-score AUCell activity across cell populations within each regulon
-scenic_subtype_AUC_scaled <- t(scale(t(scenic_subtype_AUC_matrix)))
-
-# plot mean AUCell activity for the selected mature neuronal subtypes
-pdf("scenic_NEN_AUCell_heatmap.pdf", height = 5, width = 3, useDingbats = FALSE)
-Heatmap(scenic_subtype_AUC_scaled,
-        name = "Mean AUCell\nZ-score", 
-        col = colorRamp2(c(-2, 0, 2), c("#2674B8", "white", "#D9364A")),
-        cluster_rows = FALSE, 
-        cluster_columns = FALSE,
-        row_names_gp = gpar(fontsize = 7), 
-        column_names_gp = gpar(fontsize = 7),
-        column_names_rot = 0,
-        column_names_centered = TRUE,
-        heatmap_legend_param = list(title_gp = gpar(fontsize = 7),
-                                    labels_gp = gpar(fontsize = 7),
-                                    grid_width = unit(3, "mm"),
-                                    grid_height = unit(4, "mm"),
-                                    at = c(-2, 0, 2)))
-dev.off()
-
-# replace the two-line header with readable column names
-colnames(scenic_regulon) <- c("TF", "MotifID", "AUC", "NES", "MotifSimilarityQvalue", "OrthologousIdentity", "Annotation", "Context", "TargetGenes", "RankAtMax")
-
 # remove the two header rows from the imported CSV
 scenic_regulon <- scenic_regulon %>% slice(-(1:2))
 
 # extract gene symbols from Python-style TargetGenes lists and remove duplicate TF–target pairs
 scenic_targets <- scenic_regulon %>%
-  select(TF, TargetGenes) %>%
+  dplyr::select(TF, TargetGenes) %>%
   filter(!is.na(TF), !is.na(TargetGenes)) %>%
   mutate(target = stringr::str_extract_all(TargetGenes, "(?<=\\(')[^']+(?=',)")) %>%
   select(TF, target) %>%
@@ -282,9 +289,9 @@ scenic_tradeSeq_enrichment <- expand_grid(TF = names(scenic_target_sets),
   mutate(FDR = p.adjust(pvalue, method = "BH"),
          
     # enrichment strength = observed overlap / expected overlap
-    if_else(expected > 0, overlap / expected, NA_real_),
+    fold_enrichment = if_else(expected > 0, overlap / expected, NA_real_),
     overlap_pct = if_else(n_targets > 0, 100 * overlap / n_targets, NA_real_)) %>%
-  select(TF, programme, n_targets, n_programme, overlap,
+  dplyr::select(TF, programme, n_targets, n_programme, overlap,
          overlap_pct, expected, fold_enrichment, pvalue, FDR)
 
 # compact summary of results table
@@ -344,16 +351,12 @@ scenic_focus_regulons <- c("NR3C1", "FOSB", "EGR1", "FOSL2", "THRA", "THRB")
 # reshape the unscaled, per-cell AUCell scores into long format for PVN NENs only
 scenic_focus_AUC <- scenic_auc_annotated %>%
   filter(scenic_group %in% c("PVN: non-NEN", "PVN: OXT", "PVN: AVP-OXT", "PVN: AVP-CRH", "PVN: TRH")) %>%
-  select(scenic_group, all_of(paste0(scenic_focus_regulons, "(+)"))) %>%
+  dplyr::select(scenic_group, all_of(paste0(scenic_focus_regulons, "(+)"))) %>%
   pivot_longer(-scenic_group, names_to = "regulon", values_to = "AUC") %>%
-  mutate(
-    regulon = factor(sub("\\(\\+\\)$", "", regulon), levels = scenic_focus_regulons),
-    scenic_group = factor(
-      scenic_group,
-      levels = c("PVN: non-NEN", "PVN: OXT", "PVN: AVP-OXT", "PVN: AVP-CRH", "PVN: TRH"),
-      labels = c("non-NEN", "OXT", "AVP-OXT", "AVP-CRH", "TRH")
-    )
-  )
+  mutate(regulon = factor(sub("\\(\\+\\)$", "", regulon), levels = scenic_focus_regulons),
+    scenic_group = factor(scenic_group,
+                          levels = c("PVN: non-NEN", "PVN: OXT", "PVN: AVP-OXT", "PVN: AVP-CRH", "PVN: TRH"),
+                          labels = c("non-NEN", "OXT", "AVP-OXT", "AVP-CRH", "TRH")))
 
 # show the single-cell activity distributions as violins with inset boxplots
 ggplot(scenic_focus_AUC, aes(x = scenic_group, y = AUC, fill = scenic_group)) +
@@ -408,7 +411,7 @@ nr3c1_layout <- tibble(name = V(nr3c1_graph)$name, category = V(nr3c1_graph)$cat
   mutate(angle = seq(first(start), first(start) + 70, length.out = n())) %>%
   ungroup() %>%
   mutate(x = 2.5 * cos(angle * pi / 180), y = 2.5 * sin(angle * pi / 180)) %>%
-  select(name, category, x, y) %>%
+  dplyr::select(name, category, x, y) %>%
   bind_rows(tibble(name = "NR3C1", category = "NR3C1", x = 0, y = 0)) %>%
   arrange(match(name, V(nr3c1_graph)$name))
 
@@ -437,4 +440,3 @@ ggraph(nr3c1_graph, layout = "manual", x = nr3c1_layout$x, y = nr3c1_layout$y) +
         legend.key.height = unit(3, "mm"),
         legend.key.spacing.y = unit(0, "mm"))
 ggsave("SCENIC_NR3C1_network.tiff", height = 2.2, width = 3, dpi = 600, compression = "lzw")
-
