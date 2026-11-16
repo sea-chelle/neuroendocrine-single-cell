@@ -1,5 +1,6 @@
 # Load required packages
 library(Seurat)
+library(harmony)
 library(tidyverse)
 library(here)
 
@@ -19,12 +20,15 @@ LabelPoints(plot = VariableFeaturePlot(nuclei_dev),
 # continue with standard seurat workflow
 nuclei_dev <- ScaleData(nuclei_dev, vars.to.regress = c("S.Score", "G2M.Score", "percent.mt"))
 nuclei_dev <- RunPCA(nuclei_dev, features = VariableFeatures(object = nuclei_dev))
-ElbowPlot(nuclei_dev)
+ElbowPlot(nuclei_dev, reduction = "pca", ndims = 50)
+
+# run harmony for batch correction
+nuclei_dev <- RunHarmony(nuclei_dev, group.by.vars = "dataset")
 
 # UMAP dimensionality reduction clusters
-nuclei_dev <- FindNeighbors(nuclei_dev, dims = 1:40)
+nuclei_dev <- FindNeighbors(nuclei_dev, reduction = "harmony", dims = 1:40)
 nuclei_dev <- FindClusters(nuclei_dev, resolution = 0.5)
-nuclei_dev <- RunUMAP(nuclei_dev, dims = 1:40)
+nuclei_dev <- RunUMAP(nuclei_dev, reduction = "harmony", dims = 1:40)
 
 # visualising clusters
 DimPlot(nuclei_dev, reduction = "umap", group.by = "seurat_clusters", label = TRUE)
@@ -32,6 +36,9 @@ ggsave("UMAP_neuroendocrine_unannotated.png", height = 7, width = 8)
 
 # looking at cluster sizes
 table(nuclei_dev@meta.data$seurat_clusters) 
+
+# save unannotated seurat object
+saveRDS(nuclei_dev, here("r_obj", "nuclei_dev_unannotated.rds"))
 
 # AH markers
 FeaturePlot(nuclei_dev, features = c("SIX3", "DLX1", "DLX2", "DLX5", "DLX6", "ACHE"))
@@ -160,11 +167,7 @@ VlnPlot(nuclei_dev, features = c("GBX2", "TCF7L2", "GATA2", "GATA3"), pt.size = 
 ggsave("violin_thalamus_marker.png", height = 10, width = 30, dpi = 300)
 
 # find differentially expressed genes from each cell type
-nuclei_dev_markers <- FindAllMarkers(nuclei_dev, 
-                                     only.pos = TRUE, 
-                                     min.pct = 0.25,
-                                     min.diff.pct = 0.25,
-                                     logfc.threshold = 0.25)
+nuclei_dev_markers <- FindAllMarkers(nuclei_dev, only.pos = TRUE, min.pct = 0.25, min.diff.pct = 0.25, logfc.threshold = 0.25)
 
 # get top 10 markers for each cluster
 top10_markers <- function(x){
@@ -172,30 +175,28 @@ top10_markers <- function(x){
   }
 
 # create df of top 10 markers for each cluster
-top10_markers_neuroendocrine_df <- map_dfr(0:34, top10_markers)
+top10_markers_neuroendocrine_df <- map_dfr(0:33, top10_markers)
 
 # save as .csv file
-write.csv(top10_markers_neuroendocrine_df, here("csv", "nuclei_dev_top10_markers.csv"))
+write.csv(top10_markers_neuroendocrine_df, here("csv", "top10_markers_nuclei_dev.csv"))
 
 # renaming cluster numbers to cell types
-new_cluster_ids_nuclei <- c("Thalamus", "AH", "Tuberal", "Unresolved", "Unresolved", "Unresolved", "TMN", "PVN", "POA", "VMH",
-                            "PMN", "Unresolved", "Prethalamus", "ARC", "PH", "Thalamus", "Unresolved", "ARC", "Tuberal", "Unresolved",
-                            "TMN", "PVN", "LH", "ARC", "Telencephalic", "SCN", "PVN", "Prethalamus", "PH", "Thalamus",
-                            "SMN", "Thalamus", "Telencephalic", "MB", "Telencephalic")
+new_cluster_ids_nuclei <- c("Thalamus", "Prethalamus", "Unresolved", "Tuberal", "Unresolved", "Unresolved", "PVN", "TMN", "POA", "TMN",
+                            "MB", "Prethalamus", "Tuberal", "ARC", "Prethalamus", "VMH", "Thalamus", "ARC", "Unresolved", "PVN",
+                            "Unresolved", "Thalamus", "ARC", "Telencephalic", "LH", "PVN", "SCN", "POA", "Prethalamus", "SMN",
+                            "Thalamus", "SMN", "Telencephalic", "MB")
 
 names(new_cluster_ids_nuclei) <- levels(nuclei_dev)
 nuclei_dev <- RenameIdents(nuclei_dev, new_cluster_ids_nuclei)
 nuclei_dev@meta.data$"cell_type" <- as.factor(nuclei_dev@active.ident)
 nuclei_dev$cell_type <- factor(nuclei_dev$cell_type, levels = sort(unique(as.character(nuclei_dev$cell_type))))
 
-DimPlot(nuclei_dev, reduction = "umap", group.by = "cell_type", label = FALSE, pt.size = 0.01)
-
 # visualise annotated UMAP
 DimPlot(nuclei_dev, reduction = "umap", group.by = "cell_type", label = FALSE, pt.size = 0.01) +
-  scale_colour_manual(values = c("AH" = "#D78FA9", "ARC" = "#5FA9A2", "LH" = "#8E3F54", "MB" = "#B85F78", "PH" = "#765996", 
-                                 "PMN" = "#9BCB9A", "POA" = "#78A8D1", "Prethalamus" = "#587F9E",  "PVN" = "#A995C9", "SCN" = "#DD805E", 
-                                 "SMN" = "#829B73", "Telencephalic" = "#B85F5A",  "Thalamus" = "#3F8C5A", "TMN" = "#D5A928", 
-                                 "Tuberal" = "#B2A52E", "Unresolved" = "grey80", "VMH" = "#755333")) +
+  scale_colour_manual(values = c("ARC" = "#D78FA9", "LH" = "#B85F5A", "MB" = "#8E3F54", "POA" = "#78A8D1", 
+                                 "Prethalamus" = "#5FA9A2",  "PVN" = "#A995C9", "SCN" = "#B2A52E", "SMN" = "#755333", 
+                                 "Telencephalic" = "#829B73",  "Thalamus" = "#9BCB9A", "TMN" = "#DD805E", 
+                                 "Tuberal" = "#D5A928", "Unresolved" = "grey80", "VMH" = "#765996")) +
   guides(colour = guide_legend(override.aes = list(size = 1.5))) +
   theme_void() +
   theme(plot.title = element_blank(), 
@@ -203,46 +204,30 @@ DimPlot(nuclei_dev, reduction = "umap", group.by = "cell_type", label = FALSE, p
         legend.key.height = unit(4, "mm"),
         legend.box.spacing = unit(0, "pt"))
 
-ggsave("umap_nuclei_annotated.tiff", height = 2.5, width = 3.1, dpi = 600, compression = "lzw")
-
-DimPlot(nuclei_dev, reduction = "umap", group.by = "cell_type", label = FALSE, pt.size = 0.0001) +
-  scale_colour_manual(values = c("AH" = "#DD805E", "ARC" = "#D78FA9", "LH" = "#D5A928", "MB" = "#B85F78", "PH" = "#B85F5A", 
-                                 "PMN" = "#3F8C5A", "POA" = "#78A8D1", "Prethalamus" = "#587F9E",  "PVN" = "#A995C9", "SCN" = "#B2A52E", 
-                                 "SMN" = "#9BCB9A", "Telencephalic" = "#755333",  "Thalamus" = "#5FA9A2", "TMN" = "#765996", 
-                                 "Tuberal" = "#829B73", "Unresolved" = "grey80", "VMH" = "#8E3F54")) +
-  guides(colour = guide_legend(override.aes = list(size = 1.5))) +
-  theme_void() +
-  theme(plot.title = element_blank(), 
-        legend.text = element_text(size = 7),
-        legend.key.height = unit(4, "mm"),
-        legend.box.spacing = unit(0, "pt"))
-ggsave("umap_nuclei_annotated.tiff", height = 2.8, width = 3, dpi = 600, compression = "lzw")
+ggsave("umap_nuclei_annotated.tiff", height = 2.5, width = 3.3, dpi = 600, compression = "lzw")
 
 table(nuclei_dev@meta.data$cell_type) # looking at cluster sizes
 
 # set order
 nuclei_dev$cell_type <- factor(nuclei_dev$cell_type,
-                               levels = c("AH", "PVN", "POA", "SCN", "Tuberal", "ARC", "TMN", "VMH", "LH", "PH", 
-                                          "MB", "PMN", "SMN", "Prethalamus", "Thalamus", "Telencephalic", "Unresolved"))
+                               levels = c("PVN", "POA", "SCN", "Tuberal", "ARC", "TMN", "VMH", "LH",  
+                                          "MB", "SMN", "Prethalamus", "Thalamus", "Telencephalic", "Unresolved"))
 
 # plot dotplot of markers
 DotPlot(nuclei_dev, assay = "RNA", group.by = "cell_type",
-        features = c("BCL11B", "SOX6", "MEF2C", "FOXG1", # Telencephalic
+        features = c("SOX6", "LHX6", "FOXG1", # Telencephalic
                      "GBX2", "TCF7L2",  # Thalamus
                      "MEIS2", "SP9",  # Prethalamus
                      "BARHL2", "LMX1A",  # SMN
-                     "PITX2", "ADCYAP1", # PMN
-                     "RPRM", "FOXB1", # MB
-                     "CRABP1", "IRX2",  # PH
+                     "PITX2", "FOXB1", # MB
                      "PDYN", "HCRT",  # LH
                      "NR5A1", "FEZF1",  # VMH
                      "SLC18A2", "HDC", # TMN
                      "KISS1", "POMC", "GHRH", # ARC
                      "TBX3", "ISL1", # Tuberal
-                     "SIX3", "RELN", # SCN
-                     "NFIX",  # POA
-                     "OTP", "SIM1", # PVN
-                     "DLX2", "ARX"  # AH
+                     "SIX6", "SIX3", # SCN
+                     "ARX", "NFIX",  # POA
+                     "OTP", "SIM1" # PVN
                      ),
         dot.scale = 3, cols = c("grey100", "#7656A8")) +
   coord_flip() +
@@ -259,7 +244,10 @@ DotPlot(nuclei_dev, assay = "RNA", group.by = "cell_type",
         legend.spacing.y = unit(0, "mm"),
         legend.box.spacing = unit(0, "pt"),
         panel.grid = element_blank(),
-        panel.heights = unit(34 * 0.3, "cm"),
-        panel.widths = unit(length(unique(seurat_dev$cell_type)) * 0.4, "cm"))
+        panel.heights = unit(28 * 0.3, "cm"),
+        panel.widths = unit(length(unique(seurat_dev$cell_type)) * 0.3, "cm"))
 
-ggsave("nuclei_marker_dotplot.tiff", height = 4.6, width = 3.5, dpi = 600, compression = "lzw")
+ggsave("nuclei_marker_dotplot.tiff", height = 3.9, width = 2.9, dpi = 600, compression = "lzw")
+
+# save annotated Seruat object
+saveRDS(nuclei_dev, here("r_obj", "nuclei_dev.rds"))
