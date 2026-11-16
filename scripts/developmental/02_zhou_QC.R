@@ -11,8 +11,7 @@ library(Matrix)
 setwd(here("data"))
 
 # get data location
-dirs <- list.dirs(path = "zhou_2022/",
-                  recursive = FALSE, full.names = FALSE)
+dirs <- list.dirs(path = "zhou_2022/",recursive = FALSE, full.names = FALSE)
 
 # import matrix files and create seurat object for each folder in dirs
 for(x in dirs) {
@@ -26,7 +25,7 @@ for(x in dirs) {
 }
 
 # merge seurat objects from the same biological replicate together
-GW7_sample1_whole_male <- merge(GW7_sample1_lane1_whole_male, GW7_sample1_lane2_whole_male,
+GW7_sample1_whole_male <- merge(GW7_sample1_lane1_whole_male, GW7_sample1_lane2_whole_male, 
                                 add.cell.ids = c("lane1", "lane2"), merge.data = FALSE)
 
 GW8_sample1_whole_female <- merge(GW8_sample1_lane1_whole_female, GW8_sample1_lane2_whole_female,
