@@ -22,10 +22,7 @@ for (i in seq_along(seurat_herb)) {
 }
 
 # merge into one seurat object
-seurat_herb <- merge(seurat_herb[[1]], 
-                     y = seurat_herb[-1], 
-                     add.cell.ids = names(seurat_herb), 
-                     project = "herb_2023")
+seurat_herb <- merge(seurat_herb[[1]], y = seurat_herb[-1], add.cell.ids = names(seurat_herb), project = "herb_2023")
 
 # check all samples are present in seurat object
 table(seurat_herb@meta.data$sample)
