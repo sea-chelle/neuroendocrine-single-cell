@@ -54,7 +54,7 @@ adult_NEN_comarkers <- list(CRH = c("CARTPT", "RASD1", "PENK", "RAMP1", "NR3C1")
                             GHRH = c("GAL", "DLK1", "ECEL1", "FOXP2", "GHR"))
 
 # combine markers without duplicates and reverse order for plotting
-adult_NEN_marker_plot <- rev(unique(unlist(adult_NEN_comarkers)))
+adult_NEN_marker_plot <- rev((unique(unlist(adult_NEN_comarkers))))
 
 # set order for plotting
 NEN_adult$NEN_subtype <- factor(NEN_adult$NEN_subtype, levels = adult_NEN_order)
@@ -64,11 +64,10 @@ DotPlot(NEN_adult, assay = "RNA", group.by = "NEN_subtype",
         features = adult_NEN_marker_plot,
         dot.scale = 3,
         cols = c("grey100", "#7656A8")) +
-  coord_flip() +
   guides(colour = guide_colourbar(title = "Average\nexpression"), size = guide_legend(title = "Percent\nexpressed")) +
   theme_bw() +
-  theme(axis.text.x = element_text(size = 7, angle = 45, hjust = 1),
-        axis.text.y = element_text(size = 7, face = "italic"),
+  theme(axis.text.x = element_text(size = 7, angle = 45, hjust = 1, face = "italic"),
+        axis.text.y = element_text(size = 7,),
         axis.title = element_blank(),
         legend.title = element_text(size = 7),
         legend.text = element_text(size = 7),
@@ -77,10 +76,10 @@ DotPlot(NEN_adult, assay = "RNA", group.by = "NEN_subtype",
         legend.spacing.y = unit(0, "mm"),
         legend.box.spacing = unit(0, "pt"),
         panel.grid = element_blank(),
-        panel.heights = unit(25 * 0.3, "cm"),
-        panel.widths = unit(length(adult_NEN_order) * 0.5, "cm"))
+        panel.widths = unit(25 * 0.4, "cm"),
+        panel.heights = unit(length(adult_NEN_order) * 0.5, "cm"))
 
-ggsave("NEN_marker_dotplot.tiff", height = 3.5, width = 2.3, dpi = 600, compression = "lzw")
+ggsave("NEN_marker_dotplot.tiff", height = 2.5, width = 5.3, dpi = 600, compression = "lzw")
 
 # subset all AVP neurons
 AVP_adult <- subset(NEN_adult, subset = NEN_subtype %in% c("AVP_PVN", "AVP_SON"))
