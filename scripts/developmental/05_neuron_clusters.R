@@ -129,4 +129,4 @@ DotPlot(neuron_dev, assay = "RNA", group.by = "cell_type",
         legend.box.spacing = unit(0, "pt"),
         panel.grid = element_blank())
 
-ggsave("neuron_marker_dotplot.tiff", height = 3, width = 2.5, dpi = 600, compression = "lzw")
+ggsave("neuron_marker_dotplot.tiff", height = 2.5, width = 2.5, dpi = 600, compression = "lzw")
