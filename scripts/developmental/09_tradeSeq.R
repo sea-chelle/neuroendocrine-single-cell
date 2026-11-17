@@ -26,9 +26,7 @@ dim(counts_trade) # 47,429 genes across 19,892 cells
 pseudotime_vector <- pseudotime(cds_pvn_main)[trade_cells]
 
 # retrieve the nearest graph node for every trajectory cell
-trade_cell_nodes <- cell_metadata$closest_node[
-  match(trade_cells, cell_metadata$cell)
-]
+trade_cell_nodes <- cell_metadata$closest_node[match(trade_cells, cell_metadata$cell)]
 
 # assign each cell a weight of 1 when its graph node lies on a lineage path
 cell_weights <- vapply(endpoint_paths,
@@ -464,8 +462,7 @@ terminal_mean_expression <- sapply(terminal_groups,
     group_cells <- terminal_metadata$cell[terminal_metadata$terminal_PVN_group == group]
     rowMeans(terminal_logcounts[, group_cells, drop = FALSE])
     })
-colnames(terminal_mean_expression) <-
-  terminal_groups
+colnames(terminal_mean_expression) <- terminal_groups
 
 # terminal programmes displayed in the TF heatmap
 tf_program_levels <- c("OXT/AVP-OXT-enriched", "TRH/AVP-CRH-enriched", "Shared NEN-enriched", "non-NEN-enriched", "Shared across all terminals")
