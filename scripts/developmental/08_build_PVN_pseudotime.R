@@ -5,6 +5,7 @@ library(Seurat)
 library(monocle3)
 library(harmony)
 library(SeuratWrappers)
+library(igraph)
 library(patchwork)
 
 set.seed(123)
@@ -181,7 +182,7 @@ cell_metadata <- as.data.frame(colData(cds_pvn_main)) %>%
   mutate(monocle_pseudotime = monocle3::pseudotime(cds_pvn_main)[cell])
 
 # characterise four-edge neighbourhoods around all graph leaves
-terminal_nodes <-V(pvn_graph)$name[igraph::degree(pvn_graph) == 1]
+terminal_nodes <- V(pvn_graph)$name[igraph::degree(pvn_graph) == 1]
 terminal_distances <- distances(pvn_graph, v = terminal_nodes, to = igraph::V(pvn_graph), weights = NA)
 
 terminal_counts <- map_dfr(terminal_nodes, function(tip) {
@@ -278,7 +279,7 @@ plot_graph <- function(colour_by, title) {
 
 # plot UMAPs by cell identity, GW, pseudotime and trajectory branch
 p_graph_identity <- plot_graph("trajectory_identity", "PVN identities") +
-  scale_colour_manual(values = identity_colours, name = NULL) + 
+  scale_colour_manual(values = identity_colours, name = NULL, labels = function(x) gsub("non_NEN", "non-NEN", x)) + 
   guides(colour = guide_legend(title = "PVN identities", override.aes = list(size = 1.5)))
 
 # pseudotime UMAP
