@@ -6,6 +6,8 @@
 #SBATCH --cpus-per-task=1
 #SBATCH --output=logs/cellex_%j.out
 #SBATCH --error=logs/cellex_%j.err
+#SBATCH --partition=myriad
+#SBATCH --qos=1cpu72h
 
 set -euo pipefail
 
