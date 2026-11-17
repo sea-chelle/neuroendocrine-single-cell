@@ -92,8 +92,13 @@ table(POA_dev@meta.data$seurat_clusters)
 FeaturePlot(POA_dev, features = c("GNRH1"))
 ggsave("UMAP_POA_neuropeptides.png", height = 10, width = 10, dpi = 300)
 
-VlnPlot(POA_dev, features = c("GNRH1"))
-ggsave("violin_POA_neuropeptides.png", height = 5, width = 10)
+VlnPlot(POA_dev, features = c("GNRH1")) +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.05))) +
+  theme(axis.text = element_text(size = 8),
+        axis.title = element_text(size = 8),
+        plot.title = element_text(size = 9),
+        legend.position = "none")
+ggsave("violin_POA_neuropeptide.tiff", height = 2.5, width = 5.5)
 
 # neuroendocrine co-markers in the POA
 FeaturePlot(POA_dev, features = c("KISS1R", "COCH", "CXCL14", "EBF3", "SEMA3C", "SEMA4D", "SOX4", 
@@ -137,8 +142,16 @@ ggsave("UMAP_ARC_unannotated.png", height = 5, width = 6)
 FeaturePlot(ARC_dev, features = c("GHRH", "TH"))
 ggsave("UMAP_ARC_neuropeptides.png", height = 8, width = 15, dpi = 300)
 
-VlnPlot(ARC_dev, features = c("GHRH", "TH"))
-ggsave("violin_ARC_neuropeptides.png", height = 5, width = 15)
+VlnPlot(ARC_dev, features = "GHRH")
+ggsave("violin_ARC_GHRH.tiff", height = 2.5, width = 5.5)
+
+VlnPlot(ARC_dev, features = "TH") +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.05))) +
+  theme(axis.text = element_text(size = 8),
+        axis.title = element_text(size = 8),
+        plot.title = element_text(size = 9),
+        legend.position = "none")
+ggsave("violin_ARC_TH.tiff", height = 2.5, width = 5.5)
 
 # neuroendocrine co-markers in the ARC
 FeaturePlot(ARC_dev, features = c("TRH", "GAL", "SLC6A3", "DDC", "SLC18A2", "GSX1", "FOXP2", "DLX1", "DLX2",
