@@ -125,7 +125,14 @@ Idents(PVN_NEN_subset) <- "C4_named"
 VlnPlot(PVN_NEN_subset, features = PVN_NEN_markers, pt.size = 0, stack = TRUE, flip = TRUE)
 
 # examine preautonomic marker expression using stacked violins
-VlnPlot(PVN_NEN_subset, features = PVN_preautonomic_markers, pt.size = 0, stack = TRUE, flip = TRUE)
+VlnPlot(PVN_NEN_subset, features = PVN_preautonomic_markers, pt.size = 0, stack = TRUE, flip = TRUE) +
+  scale_x_discrete(labels = function(x) sub(" .*", "", x)) +
+  theme(legend.position = "none",
+        axis.text.x = element_text(size = 8, hjust = 0.5, angle = 0),
+        axis.text.y = element_text(size = 8),
+        axis.title = element_text(size = 8),
+        strip.text.y = element_text(size = 8, face = "bold"))
+ggsave(here("plots", "violin_preautonomic_PVN_adult.tiff"), height = 3, width = 5, dpi = 600, compression = "lzw")
 
 # assign PVN/SON NEN identities
 adult_PVN_annotations <- tibble(cluster_id = c("C4-293", "C4-295", "C4-297", "C4-298", "C4-312", "C4-313", "C4-314", "C4-315"),
@@ -379,3 +386,100 @@ DotPlot(NEN_adult, assay = "RNA", group.by = "NEN_subtype",
         panel.widths = unit(length(adult_NEN_order) * 0.5, "cm"))
 
 ggsave(here("plots", "adult_NEN_dotplot.tiff"), height = 3.1, width = 2.3, dpi = 600, compression = "lzw")
+
+# identify C4 clusters assigned to each anatomical region
+adult_region_clusters <- adult_spatial %>%
+  filter(grepl("^C4-", `C4 cluster`)) %>%
+  dplyr::select(cluster_id = `C4 cluster`, region = `Region with highest abdunance score`)
+
+# define region-specific clusters
+POA_ids <- adult_region_clusters %>%
+  filter(region %in% c("POA", "MPOA", "LPOA")) %>%
+  pull(cluster_id)
+
+ARC_ids <- adult_region_clusters %>%
+  filter(region == "ARC") %>%
+  pull(cluster_id)
+
+periventricular_ids <- adult_region_clusters %>%
+  filter(region == "Periventricular") %>%
+  pull(cluster_id)
+
+# POA neurons
+POA_subset <- subset(seurat_adult, cells = colnames(seurat_adult)[sub(" .*", "", seurat_adult$C4_named) %in% POA_ids])
+
+# ARC neurons
+ARC_subset <- subset(seurat_adult, cells = colnames(seurat_adult)[sub(" .*", "", seurat_adult$C4_named) %in% ARC_ids])
+
+# periventricular neurons
+periventricular_subset <- subset(seurat_adult, cells = colnames(seurat_adult)[sub(" .*", "", seurat_adult$C4_named) %in% periventricular_ids])
+
+# POA GnRH expression
+VlnPlot(POA_subset, features = "GNRH1", group.by = "C4_named", assay = "RNA", pt.size = 0) +
+  scale_x_discrete(labels = function(x) sub(" .*", "", x)) +
+  labs(x = NULL, y = "Expression level", title = "POA: GNRH1") +
+  theme_classic() +
+  theme(plot.title = element_text(size = 9, face = "bold", hjust = 0.5),
+        axis.text.x = element_text(size = 7, angle = 90, hjust = 1),
+        axis.text.y = element_text(size = 7),
+        axis.title.y = element_text(size = 8),
+        legend.position = "none")
+ggsave("violin_POA_GNRH1_adult.tiff", height = 2.5, width = 9.9)
+
+# define GnRH-associated and cholinergic markers
+markers_to_plot <- c("GNRH1", "ISL1", "KISS1R", "COCH", "CXCL14", "ACHE", "CHAT", "SLC18A3")
+
+# extract marker expression from C4-194
+GnRH_194_markers <- FetchData(GnRH_194, vars = markers_to_plot, layer = "data")
+
+# calculate percentage of C4-194 cells expressing each marker
+GnRH_194_barplot <- GnRH_194_markers %>%
+  summarise(across(everything(), ~ mean(.x > 0) * 100)) %>%
+  pivot_longer(everything(), names_to = "gene", values_to = "percent_expressed") %>%
+  mutate(gene = factor(gene, levels = markers_to_plot),
+         gene_class = factor(ifelse(gene %in% c("ACHE", "CHAT", "SLC18A3"), "Cholinergic", "GnRH-associated"),
+                             levels = c("GnRH-associated", "Cholinergic")))
+
+# plot marker expression across C4-194
+ggplot(GnRH_194_barplot, aes(x = gene, y = percent_expressed, fill = gene_class)) +
+  geom_col(width = 0.7) +
+  facet_grid(~gene_class, scales = "free_x", space = "free_x") +
+  scale_fill_manual(values = c("Cholinergic" = "#78A8D1",
+                               "GnRH-associated" = "#A995C9")) +
+  scale_y_continuous(limits = c(0, 100), expand = expansion(mult = c(0, 0.02))) +
+  labs(x = NULL, y = "Cells expressing marker (%)") +
+  theme_classic() +
+  theme(strip.background = element_blank(),
+        strip.text = element_text(size = 8, face = "bold"),
+        axis.text.x = element_text(size = 8),
+        axis.text.y = element_text(size = 8),
+        axis.title.y = element_text(size = 8),
+        axis.line = element_line(linewidth = 0.3),
+        axis.ticks = element_line(linewidth = 0.3),
+        legend.position = "none")
+
+ggsave(here("plots", "adult_GnRH_C4-194_markers.tiff"), width = 4.5, height = 2, dpi = 600, compression = "lzw")
+
+# ARC dopaminergic expression
+VlnPlot(ARC_subset, features = "TH", group.by = "C4_named", assay = "RNA") +
+  scale_x_discrete(labels = function(x) sub(" .*", "", x)) +
+  labs(x = NULL, y = "Expression level", title = "ARC: TH") +
+  theme_classic() +
+  theme(plot.title = element_text(size = 9, face = "bold", hjust = 0.5),
+        axis.text.x = element_text(size = 7, hjust = 1, angle = 90),
+        axis.text.y = element_text(size = 7),
+        axis.title.y = element_text(size = 8),
+        legend.position = "none")
+ggsave("violin_ARC_TH_adult.tiff", height = 2.5, width = 5.5)
+
+# periventricular somatostatin expression
+VlnPlot(periventricular_subset, features = "SST", group.by = "C4_named", assay = "RNA") +
+  scale_x_discrete(labels = function(x) sub(" .*", "", x)) +
+  labs(x = NULL, y = "Expression level", title = "Periventricular: SST") +
+  theme_classic() +
+  theme(plot.title = element_text(size = 9, face = "bold", hjust = 0.5),
+        axis.text.x = element_text(size = 7, angle = 90, hjust = 1),
+        axis.text.y = element_text(size = 7),
+        axis.title.y = element_text(size = 8),
+        legend.position = "none")
+ggsave("violin_peri_SST_adult.tiff", height = 2.5, width = 5.5)
