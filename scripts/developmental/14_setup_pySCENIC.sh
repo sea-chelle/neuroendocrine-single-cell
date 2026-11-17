@@ -14,7 +14,7 @@ rsync -avh --progress \
   pySCENIC/input/
 
 # go to resources folder
-  cd pySCENIC/resources
+cd pySCENIC/resources
 
 # download the human TF list
 wget https://resources.aertslab.org/cistarget/tf_lists/allTFs_hg38.txt

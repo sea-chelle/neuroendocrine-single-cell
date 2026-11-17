@@ -1,6 +1,6 @@
 #!/bin/bash -l
 
-#SBATCH --job-name=pySCENIC
+#SBATCH --job-name=pySCENIC_dev
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
@@ -22,9 +22,9 @@ module load ucl-stack/2026-07
 module load default-modules/2026-07
 
 ROOT="/home/sejj745/Scratch/pySCENIC"
-INPUT="${ROOT}/input"
+INPUT="${ROOT}/input/dev"
 RESOURCES="${ROOT}/resources"
-OUTPUT="${ROOT}/output"
+OUTPUT="${ROOT}/output/dev"
 CONTAINER="${ROOT}/container/aertslab-pyscenic-0.12.1.sif"
 CORES="${SLURM_CPUS_PER_TASK}"
 
@@ -42,8 +42,7 @@ required_files=(
   "${RESOURCES}/motifs-v10nr_clust-nr.hgnc-m0.001-o0.0.tbl"
   "${RESOURCES}/hg38_10kbp_up_10kbp_down_full_tx_v10_clust.genes_vs_motifs.rankings.feather"
   "${RESOURCES}/hg38_500bp_up_100bp_down_full_tx_v10_clust.genes_vs_motifs.rankings.feather"
-  "${CONTAINER}"
-)
+  "${CONTAINER}")
 
 for file in "${required_files[@]}"; do
   if [[ ! -s "${file}" ]]; then
@@ -53,7 +52,6 @@ for file in "${required_files[@]}"; do
 done
 
 echo "All required files were found."
-
 
 # stage 1: GRNBoost2
 
@@ -71,8 +69,8 @@ if [[ ! -s "${ADJACENCIES}" ]]; then
       --num_workers "${CORES}" \
       --seed 123 \
       --sparse \
-      --output /data/output/pyscenic_adjacencies.tsv \
-      /data/input/pyscenic_inference.loom \
+      --output /data/output/dev/pyscenic_adjacencies.tsv \
+      /data/input/dev/pyscenic_inference.loom \
       /data/resources/allTFs_hg38.txt
 
   echo "GRNBoost2 completed: $(date)"
@@ -88,7 +86,6 @@ if [[ ! -s "${ADJACENCIES}" ]]; then
   exit 1
 fi
 
-
 # stage 2: motif enrichment and pruning
 
 REGULONS="${OUTPUT}/pyscenic_regulons.csv"
@@ -101,14 +98,14 @@ if [[ ! -s "${REGULONS}" ]]; then
     --bind "${ROOT}:/data" \
     "${CONTAINER}" \
     pyscenic ctx \
-      /data/output/pyscenic_adjacencies.tsv \
+      /data/output/dev/pyscenic_adjacencies.tsv \
       /data/resources/hg38_10kbp_up_10kbp_down_full_tx_v10_clust.genes_vs_motifs.rankings.feather \
       /data/resources/hg38_500bp_up_100bp_down_full_tx_v10_clust.genes_vs_motifs.rankings.feather \
       --annotations_fname /data/resources/motifs-v10nr_clust-nr.hgnc-m0.001-o0.0.tbl \
-      --expression_mtx_fname /data/input/pyscenic_inference.loom \
+      --expression_mtx_fname /data/input/dev/pyscenic_inference.loom \
       --mode custom_multiprocessing \
       --num_workers "${CORES}" \
-      --output /data/output/pyscenic_regulons.csv
+      --output /data/output/dev/pyscenic_regulons.csv
 
   echo "Motif pruning completed: $(date)"
 
@@ -122,7 +119,6 @@ if [[ ! -s "${REGULONS}" ]]; then
   echo "ERROR: motif pruning did not produce a regulon file." >&2
   exit 1
 fi
-
 
 # stage 3: AUCell scoring
 
@@ -138,9 +134,9 @@ if [[ ! -s "${AUC_LOOM}" ]]; then
     pyscenic aucell \
       --num_workers "${CORES}" \
       --seed 123 \
-      --output /data/output/pyscenic_scoring_auc.loom \
-      /data/input/pyscenic_scoring.loom \
-      /data/output/pyscenic_regulons.csv
+      --output /data/output/dev/pyscenic_scoring_auc.loom \
+      /data/input/dev/pyscenic_scoring.loom \
+      /data/output/dev/pyscenic_regulons.csv
 
   echo "AUCell completed: $(date)"
 
@@ -171,7 +167,7 @@ import h5py
 import pandas as pd
 
 # open pySCENIC AUCell loom
-with h5py.File("/data/output/pyscenic_scoring_auc.loom", "r") as f:
+with h5py.File("/data/dev/output/pyscenic_scoring_auc.loom", "r") as f:
 
     # extract cell identifiers
     cell_ids = [
@@ -191,7 +187,7 @@ with h5py.File("/data/output/pyscenic_scoring_auc.loom", "r") as f:
 
     # export compressed CSV
     auc_df.to_csv(
-        "/data/output/pyscenic_auc_matrix.csv.gz",
+        "/data/dev/output/pyscenic_auc_matrix.csv.gz",
         compression="gzip"
     )
 

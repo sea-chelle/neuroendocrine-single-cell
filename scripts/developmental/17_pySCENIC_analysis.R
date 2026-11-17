@@ -152,6 +152,9 @@ scenic_NEN_matrix <- scenic_NEN_matrix[unlist(scenic_NEN_selected), , drop = FAL
 # Z-score RSS across populations for each regulon
 scenic_NEN_scaled <- t(scale(t(scenic_NEN_matrix)))
 
+# remove (+) from TF names
+rownames(scenic_NEN_scaled) <- gsub("\\(\\+\\)", "", rownames(scenic_NEN_scaled))
+
 # plot NEN versus non-NEN regulon specificity heatmap
 pdf("scenic_NEN_heatmap.pdf", height = 5, width = 6.27, useDingbats = FALSE)
 Heatmap(scenic_NEN_scaled,
@@ -206,6 +209,9 @@ colnames(scenic_subtype_matrix) <- c("\nAVP-\nCRH", "\nAVP-\nOXT", "OXT", "TRH",
 # calculate Z-score
 scenic_subtype_scaled <- t(scale(t(scenic_subtype_matrix)))
 
+# remove (+) from TF names
+rownames(scenic_subtype_scaled) <- gsub("\\(\\+\\)", "", rownames(scenic_subtype_scaled))
+
 # RSS heatmap
 pdf("scenic_NEN_heatmap.pdf", height = 4, width = 3, useDingbats = FALSE)
 Heatmap(scenic_subtype_scaled,
@@ -232,7 +238,7 @@ scenic_targets <- scenic_regulon %>%
   dplyr::select(TF, TargetGenes) %>%
   filter(!is.na(TF), !is.na(TargetGenes)) %>%
   mutate(target = stringr::str_extract_all(TargetGenes, "(?<=\\(')[^']+(?=',)")) %>%
-  select(TF, target) %>%
+  dplyr::select(TF, target) %>%
   unnest(target) %>%
   distinct(TF, target)
 
@@ -261,7 +267,6 @@ scenic_tradeSeq_sets <- list("Shared developmental dynamics" = scenic_tradeSeq_g
                                       abs(logFC1_2) < 1, logFC1_3 >= 1, logFC2_3 >= 1) %>% pull(gene) %>% unique(),
                              "non-NEN enriched" = scenic_tradeSeq_genes %>% filter(is.finite(endpoint_FDR), endpoint_FDR < 0.001,
                                                                                    detection_non_NEN >= 5, logFC1_3 <= -1, logFC2_3 <= -1) %>% pull(gene) %>% unique())
-
 
 # define the common gene universe used for the Fisher tests
 scenic_tradeSeq_background <- intersect(scenic_tradeSeq_genes$gene, scenic_targets$target)
