@@ -12,18 +12,17 @@ library(grid)
 setwd(here("plots"))
 
 # use all annotated hypothalamic neurons
-neuronchat_adult <- subset(neuron_adult, subset = !spatial_region %in% c("Thalamus", "Thalamaus", "Ventricular", "NA"))
+neuronchat_dev <- subset(nuclei_dev, subset = !NEN_region %in% c("Thalamus", "Prethalamus", "Telencephalic", "Unresolved"))
 
 # retain neuroendocrine subtype annotations and use nuclei annotations for other neurons
-neuronchat_adult$neuronchat_group <- ifelse(neuronchat_adult$NEN_type == "NEN",
-                                            as.character(neuronchat_adult$NEN_subtype),
-                                            as.character(neuronchat_adult$spatial_region))
+neuronchat_dev$neuronchat_group <- ifelse(neuronchat_dev$NEN_type == "NEN",
+                                            as.character(neuronchat_dev$NEN_subtype),
+                                            as.character(neuronchat_dev$NEN_region))
 
 # distinguish neuroendocrine subtypes by their hypothalamic nuclei
-neuronchat_adult$neuronchat_group <- recode(neuronchat_adult$neuronchat_group, 
-                                            "CRH" = "PVN: CRH",
-                                            "AVP_PVN" = "PVN: AVP",
-                                            "AVP_SON" = "SON: AVP",
+neuronchat_dev$neuronchat_group <- recode(neuronchat_dev$neuronchat_group, 
+                                            "AVP-CRH" = "PVN: AVP-CRH",
+                                            "AVP-OXT" = "PVN: AVP-OXT",
                                             "OXT" = "PVN: OXT",
                                             "TRH" = "PVN: TRH",
                                             "GHRH" = "ARC: GHRH",
@@ -31,16 +30,16 @@ neuronchat_adult$neuronchat_group <- recode(neuronchat_adult$neuronchat_group,
                                             "ARC" = "ARC: non-NEN")
 
 # inspect population sizes
-table(neuronchat_adult$neuronchat_group, useNA = "ifany")
+table(neuronchat_dev$neuronchat_group, useNA = "ifany")
 
 # extract normalised counts
-neuronchat_data <- GetAssayData(neuronchat_adult, assay = "RNA", layer = "data")
+neuronchat_data <- GetAssayData(neuronchat_dev, assay = "RNA", layer = "data")
 
 # cell group labels for NeuronChat
-neuronchat_labels <- neuronchat_adult$neuronchat_group
+neuronchat_labels <- neuronchat_dev$neuronchat_group
 
 # make sure labels are named by cell barcode
-names(neuronchat_labels) <- colnames(neuronchat_adult)
+names(neuronchat_labels) <- colnames(neuronchat_dev)
 
 # check cell type labels are in the same order as neuronchat data barcodes
 identical(colnames(neuronchat_data), names(neuronchat_labels))
@@ -93,7 +92,7 @@ neuronchat_incoming <- neuronchat_links %>%
             incoming_strength = sum(strength),
             incoming_partners = n_distinct(sender),
             .groups = "drop") %>%
-  rename(population = receiver)
+  dplyr::rename(population = receiver)
 
 # summarise total outgoing communication for each neuronal population
 neuronchat_outgoing <- neuronchat_links %>%
@@ -103,7 +102,7 @@ neuronchat_outgoing <- neuronchat_links %>%
           outgoing_strength = sum(strength),
           outgoing_partners = n_distinct(receiver),
           .groups = "drop") %>%
-  rename(population = sender)
+  dplyr::rename(population = sender)
 
 # combine incoming and outgoing communication summaries
 neuronchat_communication_summary <- neuronchat_incoming %>%
@@ -347,7 +346,7 @@ ggplot(neuronchat_interaction_plot, aes(x = NEN, y = interaction)) +
   facet_wrap(~direction, ncol = 2) +
   scale_x_discrete(labels = function(x) {
     x <- sub("^(PVN|ARC): ", "", x)
-    sub("^(AVP)-(CRH|OXT)$", "\\1\n\\2", x)
+    sub("^(AVP)-(CRH|OXT)$", "\\1-\n\\2", x)
   }) +
   scale_size_continuous(name = "Communication\npartners", range = c(1, 4) ) +
   scale_colour_gradient(low = "#E3DAF0", high = "#7656AB", name = "Total communication\nstrength") +
