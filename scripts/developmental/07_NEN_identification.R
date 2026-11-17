@@ -59,7 +59,7 @@ VlnPlot(PVN_dev, features = c("ADARB2", "RELN", "SNCA", "NTNG1", "CACNA1G"),
         axis.text = element_text(size = 8),
         axis.title = element_text(size = 8),
         strip.text.y = element_text(size = 8, face = "bold"))
-ggsave("violin_preautonomic_PVN.png", height = 3, width = 5)
+ggsave("violin_preautonomic_PVN.tiff", height = 3, width = 5)
 
 # subset POA clusters for subclustering
 POA_dev <- subset(nuclei_dev, idents = c("POA"))
@@ -307,7 +307,7 @@ VlnPlot(unresolved_dev, features = c("ADARB2", "RELN", "SNCA", "NTNG1", "CACNA1G
         axis.text = element_text(size = 8),
         axis.title = element_text(size = 8),
         strip.text.y = element_text(size = 8, face = "bold"))
-ggsave("violin_preautonomic_unannotated.png", height = 3, width = 5)
+ggsave("violin_preautonomic_unannotated.tiff", height = 3, width = 5)
 
 # check number and proportion of rare populations in each cluster
 table(PVN_dev$seurat_clusters[WhichCells(PVN_dev, expression = CRH > 0, slot = "counts")])
