@@ -75,7 +75,7 @@ run_pseudobulk_DESeq2 <- function(counts, meta, design, contrast, min_samples = 
   # filter lowly expressed genes
   keep <- rowSums(DESeq2::counts(dds) >= 10) >= min_samples
   dds <- dds[keep, ]
-  
+
   # run differential expression analysis
   dds <- DESeq(dds)
   
